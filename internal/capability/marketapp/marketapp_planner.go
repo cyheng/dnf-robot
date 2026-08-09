@@ -142,6 +142,7 @@ func (a *App) appendNormalAuctionActions(plan normalAuctionPlan, occ map[uint32]
 		count := auctionPlanActionCount(plan, i)
 		addInfo := count
 		upgrade := 0
+		var actionUpgrade *int
 		endurance := 0
 		hasEndurance := false
 		itemType := plan.Item.ItemType
@@ -155,9 +156,12 @@ func (a *App) appendNormalAuctionActions(plan normalAuctionPlan, occ map[uint32]
 					endurance = defaultAuctionEquipmentEndurance
 				}
 			}
-			upgrade = plan.Row.Upgrade
-			if upgrade <= 0 {
-				upgrade = a.randomUpgradeRange(cfg.Restock.UpgradeMin, cfg.Restock.UpgradeMax)
+			if auctionEquipmentCanUpgrade(plan.Item) {
+				upgrade = plan.Row.Upgrade
+				if upgrade <= 0 {
+					upgrade = a.randomUpgradeRange(cfg.Restock.UpgradeMin, cfg.Restock.UpgradeMax)
+				}
+				actionUpgrade = &upgrade
 			}
 		}
 		unit := a.auctionUnitPriceFor(plan.Item, plan.Row.SystemPrice, plan.BatchInflate, upgrade)
@@ -186,7 +190,7 @@ func (a *App) appendNormalAuctionActions(plan normalAuctionPlan, occ map[uint32]
 			CountAddInfo: addInfo,
 			StartPrice:   startPrice,
 			InstantPrice: total,
-			Upgrade:      upgrade,
+			Upgrade:      actionUpgrade,
 			Endurance:    endurance,
 			HasEndurance: hasEndurance,
 			Source:       auctionActionSource(plan.Row),
@@ -197,6 +201,20 @@ func (a *App) appendNormalAuctionActions(plan normalAuctionPlan, occ map[uint32]
 func auctionEquipmentHasDurability(item catalogItem) bool {
 	switch strings.ToLower(strings.TrimSpace(item.Slot)) {
 	case "weapon", "coat", "shoulder", "pants", "shoes", "waist", "belt":
+		return true
+	default:
+		return false
+	}
+}
+
+func auctionEquipmentCanUpgrade(item catalogItem) bool {
+	if item.Kind != "equipment" {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(item.Slot)) {
+	case "weapon", "coat", "shoulder", "pants", "shoes", "waist", "belt",
+		"amulet", "necklace", "wrist", "bracelet", "ring", "support",
+		"magicstone", "magic stone", "magic_stone":
 		return true
 	default:
 		return false

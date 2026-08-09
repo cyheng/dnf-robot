@@ -378,7 +378,7 @@ type Action struct {
 	CountAddInfo int32  `json:"count_or_add_info"`
 	StartPrice   int32  `json:"start_price"`
 	InstantPrice int32  `json:"instant_price"`
-	Upgrade      int    `json:"upgrade,omitempty"`
+	Upgrade      *int   `json:"upgrade,omitempty"`
 	Endurance    int    `json:"endurance,omitempty"`
 	HasEndurance bool   `json:"has_endurance,omitempty"`
 	ExtraAddInfo int32  `json:"extra_add_info,omitempty"`

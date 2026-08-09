@@ -287,8 +287,8 @@ func TestPlanAuctionEquipmentUsesSingleRecordPrice(t *testing.T) {
 		if action.Count != 1 || action.InstantPrice <= 88888 || action.CountAddInfo != 1 {
 			t.Fatalf("unexpected equipment action: %#v", action)
 		}
-		if action.Upgrade < 7 || action.Upgrade > 13 {
-			t.Fatalf("equipment upgrade = %d, want 7..13", action.Upgrade)
+		if action.Upgrade == nil || *action.Upgrade < 7 || *action.Upgrade > 13 {
+			t.Fatalf("equipment upgrade = %v, want 7..13", action.Upgrade)
 		}
 		if action.Endurance != defaultAuctionEquipmentEndurance {
 			t.Fatalf("equipment endurance = %d, want default", action.Endurance)
@@ -302,7 +302,7 @@ func TestPlanAuctionEquipmentUsesSingleRecordPrice(t *testing.T) {
 	}
 }
 
-func TestPlanAuctionEquipmentAllowsZeroUpgrade(t *testing.T) {
+func TestPlanAuctionEquipmentKeepsRandomZeroUpgrade(t *testing.T) {
 	app := testApp(t)
 	app.cfg.Restock.UpgradeMin = 0
 	app.cfg.Restock.UpgradeMax = 0
@@ -317,8 +317,8 @@ func TestPlanAuctionEquipmentAllowsZeroUpgrade(t *testing.T) {
 	if len(result.Actions) != 1 {
 		t.Fatalf("actions = %d, want 1", len(result.Actions))
 	}
-	if result.Actions[0].Upgrade != 0 {
-		t.Fatalf("equipment upgrade = %d, want 0", result.Actions[0].Upgrade)
+	if result.Actions[0].Upgrade == nil || *result.Actions[0].Upgrade != 0 {
+		t.Fatalf("equipment upgrade = %v, want explicit random value 0", result.Actions[0].Upgrade)
 	}
 }
 
@@ -350,7 +350,7 @@ func TestPlanAuctionEquipmentWithoutDurabilityLeavesEnduranceZero(t *testing.T) 
 		20001: {ItemID: 20001, Name: "title", Kind: "equipment", Attach: "trade", Slot: "title name"},
 	}
 	app.planAuction([]restockRow{{
-		ItemID: 20001, SystemPrice: 88888, Quantity: 1, Endurance: 345, Enabled: true,
+		ItemID: 20001, SystemPrice: 88888, Quantity: 1, Upgrade: 13, Endurance: 345, Enabled: true,
 	}}, catalog, map[uint32]int{}, map[uint32]int{}, result)
 
 	if len(result.Actions) != 1 {
@@ -361,6 +361,55 @@ func TestPlanAuctionEquipmentWithoutDurabilityLeavesEnduranceZero(t *testing.T) 
 	}
 	if result.Actions[0].HasEndurance {
 		t.Fatalf("non-durable equipment has_endurance = true, want false")
+	}
+	if result.Actions[0].Upgrade != nil {
+		t.Fatalf("title upgrade = %v, want unset", result.Actions[0].Upgrade)
+	}
+}
+
+func TestAuctionEquipmentCanUpgradeExcludesTitlesAndSpecialEquipment(t *testing.T) {
+	tests := []struct {
+		name string
+		item catalogItem
+		want bool
+	}{
+		{name: "weapon", item: catalogItem{Kind: "equipment", Slot: "weapon"}, want: true},
+		{name: "armor", item: catalogItem{Kind: "equipment", Slot: "coat"}, want: true},
+		{name: "accessory", item: catalogItem{Kind: "equipment", Slot: "wrist"}, want: true},
+		{name: "left slot", item: catalogItem{Kind: "equipment", Slot: "support"}, want: true},
+		{name: "right slot", item: catalogItem{Kind: "equipment", Slot: "magic stone"}, want: true},
+		{name: "title by type", item: catalogItem{Kind: "equipment", ItemType: 2}, want: false},
+		{name: "title by slot", item: catalogItem{Kind: "equipment", Slot: "title name"}, want: false},
+		{name: "creature", item: catalogItem{Kind: "equipment", ItemType: 30, Slot: "creature"}, want: false},
+		{name: "artifact", item: catalogItem{Kind: "equipment", ItemType: 31, Slot: "artifact red"}, want: false},
+		{name: "avatar", item: catalogItem{Kind: "equipment", ItemType: 20, Slot: "hatavatar"}, want: false},
+		{name: "weapon type with unknown slot", item: catalogItem{Kind: "equipment", ItemType: 1, Slot: "unknown"}, want: false},
+		{name: "stackable", item: catalogItem{Kind: "stackable", Slot: "weapon"}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := auctionEquipmentCanUpgrade(tt.item); got != tt.want {
+				t.Fatalf("auctionEquipmentCanUpgrade() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlanAuctionOmitsUpgradeForEquipmentOutsideSlotAllowlist(t *testing.T) {
+	app := testApp(t)
+	result := &PlanResult{}
+	catalog := map[uint32]catalogItem{
+		20002: {ItemID: 20002, Name: "unsupported", Kind: "equipment", ItemType: 13, Attach: "trade", Slot: "unknown"},
+	}
+	app.planAuction([]restockRow{{
+		ItemID: 20002, SystemPrice: 1000, Quantity: 1, Upgrade: 13, Enabled: true,
+	}}, catalog, map[uint32]int{}, map[uint32]int{}, result)
+
+	if len(result.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1; skipped=%#v", len(result.Actions), result.Skipped)
+	}
+	if result.Actions[0].Upgrade != nil {
+		t.Fatalf("unsupported slot upgrade = %v, want unset", result.Actions[0].Upgrade)
 	}
 }
 

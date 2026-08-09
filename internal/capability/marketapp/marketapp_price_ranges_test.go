@@ -30,9 +30,25 @@ func TestEquipmentFormulaBoundsIncludeMultiplierUpgradeAndRandomRate(t *testing.
 	app.cfg.Restock.UpgradeMax = 13
 	app.cfg.Restock.UpgradePriceRate = 0.08
 
-	low, high := app.auctionPriceBounds(catalogItem{ItemID: 31056, Kind: "equipment", Price: 1000})
+	low, high := app.auctionPriceBounds(catalogItem{ItemID: 31056, Kind: "equipment", Slot: "weapon", Price: 1000})
 	if low != 7020 || high != 17952 {
 		t.Fatalf("formula bounds=%d..%d want 7020..17952", low, high)
+	}
+}
+
+func TestEquipmentFormulaBoundsExcludeUpgradeForUnsupportedSlot(t *testing.T) {
+	app := testApp(t)
+	app.cfg.Restock.RandLow = 1
+	app.cfg.Restock.RandHigh = 1
+	app.cfg.Restock.EquipInflateMin = 1
+	app.cfg.Restock.EquipInflateMax = 1
+	app.cfg.Restock.UpgradeMin = 13
+	app.cfg.Restock.UpgradeMax = 13
+	app.cfg.Restock.UpgradePriceRate = 0.08
+
+	low, high := app.auctionPriceBounds(catalogItem{Kind: "equipment", Slot: "unknown", Price: 1000})
+	if low != 1000 || high != 1000 {
+		t.Fatalf("unsupported slot bounds=%d..%d want 1000..1000", low, high)
 	}
 }
 
@@ -65,7 +81,7 @@ func TestAuctionQualityRatesAreIncludedInCollectorBounds(t *testing.T) {
 	app.cfg.Restock.RandLow = 1
 	app.cfg.Restock.RandHigh = 1
 
-	low, high := app.auctionPriceBounds(catalogItem{Kind: "equipment", Level: 5, Rarity: 2, Price: 1000})
+	low, high := app.auctionPriceBounds(catalogItem{Kind: "equipment", Slot: "coat", Level: 5, Rarity: 2, Price: 1000})
 	if low != 1839 || high != 3679 {
 		t.Fatalf("quality bounds=%d..%d want 1839..3679", low, high)
 	}

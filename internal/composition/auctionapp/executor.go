@@ -87,7 +87,7 @@ func (e *actionExecutor) executeDirectWithSession(ctx context.Context, action ma
 	switch action.Market {
 	case "auction":
 		return e.withSession(ctx, action.Market, func(session *auction.Session) (auction.Result, error) {
-			return session.RegisterItem(auction.RegisterItemRequest{
+			request := auction.RegisterItemRequest{
 				Host:           e.cfg.AuctionHost,
 				Port:           e.cfg.AuctionPort,
 				CID:            action.OwnerID,
@@ -97,7 +97,6 @@ func (e *actionExecutor) executeDirectWithSession(ctx context.Context, action ma
 				ItemID:         action.ItemID,
 				CountOrAddInfo: action.CountAddInfo,
 				ItemType:       byte(action.ItemType),
-				ItemAttr:       byte(action.Upgrade),
 				Endurance:      uint16(action.Endurance),
 				HasEndurance:   action.HasEndurance,
 				ExtraAddInfo:   action.ExtraAddInfo,
@@ -105,7 +104,11 @@ func (e *actionExecutor) executeDirectWithSession(ctx context.Context, action ma
 				InstantPrice:   action.InstantPrice,
 				UnitPrice:      action.UnitPrice,
 				TimeoutMS:      5000,
-			})
+			}
+			if action.Upgrade != nil {
+				request.ItemAttr = byte(*action.Upgrade)
+			}
+			return session.RegisterItem(request)
 		})
 	case "cera":
 		return e.withSession(ctx, action.Market, func(session *auction.Session) (auction.Result, error) {

@@ -94,7 +94,7 @@ func (a *App) auctionPriceBounds(item catalogItem) (int32, int32) {
 	if item.Kind == "equipment" {
 		low = base * float64(cfg.Restock.EquipInflateMin) * lowRand
 		high = base * float64(cfg.Restock.EquipInflateMax) * highRand
-		if specialAuctionKind(item) == "" {
+		if auctionEquipmentCanUpgrade(item) {
 			low *= 1 + float64(cfg.Restock.UpgradeMin)*cfg.Restock.UpgradePriceRate
 			high *= 1 + float64(cfg.Restock.UpgradeMax)*cfg.Restock.UpgradePriceRate
 		}
