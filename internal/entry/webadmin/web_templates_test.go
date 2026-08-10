@@ -33,6 +33,25 @@ func TestEmbeddedWebAssetsContainRequiredContent(t *testing.T) {
 	}
 }
 
+func TestMarketPricingAndRuleSummaryAreBilingual(t *testing.T) {
+	for _, want := range []string{
+		"Base upgrade price rate", "基础强化加价率",
+		"Linear price increase through +10", "+10 及以下每级按此比例线性加价",
+		"Rule summary", "规则说明",
+		"Filtering", "过滤规则",
+		"Listing", "上架规则",
+		"Pricing", "价格公式",
+		"Recycling", "回收策略",
+		"allowlist overrides the blocklist", "白名单优先于黑名单",
+		"quadratic risk premium above +10", "+10 以上包含二次增长的风险溢价",
+		"player buyout listings", "玩家一口价商品",
+	} {
+		if !strings.Contains(appJS, want) {
+			t.Errorf("market UI is missing bilingual text %q", want)
+		}
+	}
+}
+
 func TestIndexTemplateInlinesEmbeddedAssets(t *testing.T) {
 	var rendered bytes.Buffer
 	if err := cleanIndexTemplate.Execute(&rendered, nil); err != nil {
