@@ -5,3 +5,4 @@ dialog.diagnostics{width:min(1400px,98vw);max-width:min(1400px,98vw)}dialog.diag
 dialog.ports{width:min(320px,96vw);min-width:min(320px,96vw);max-width:min(320px,96vw)}dialog.ports .formgrid{grid-template-columns:100px 92px}dialog.ports .dlgfoot button{white-space:nowrap}
 .market-policy-select{width:150px;max-width:150px;height:32px;border:1px solid #b8c2d0;border-radius:6px;background:#fff;padding:0 7px}
 .market-protection-select{width:100%;min-width:0;height:32px;border:1px solid #b8c2d0;border-radius:6px;background:#fff;padding:0 7px}
+.market-rule-article{padding:10px 12px}.market-rule-article section+section{border-top:1px solid #edf1f5;margin-top:12px;padding-top:12px}.market-rule-article h5{margin:0 0 5px;font-size:13px}.market-rule-article p{margin:0;color:var(--muted);line-height:1.65}
