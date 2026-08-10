@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"robot/internal/capability/catalog"
+	"robot/internal/foundation/charset"
 	"robot/internal/foundation/lockhub"
 	"robot/internal/shared"
 )
@@ -476,6 +477,9 @@ func formatExtendedPVFItemInfoDAT(rawText string, equipment, stackable []shared.
 		if seen[id] {
 			continue
 		}
+		fields = append([]string(nil), fields...)
+		fields[14] = encodedItemInfoName(unquoteItemInfoName(fields[14]), "item", id)
+		fields[15] = encodedItemInfoName(unquoteItemInfoName(fields[15]), "name2", id)
 		rows = append(rows, row{id: id, text: strings.Join(fields, " ")})
 		seen[id] = true
 	}
@@ -486,8 +490,6 @@ func formatExtendedPVFItemInfoDAT(rawText string, equipment, stackable []shared.
 		if len(fields) != 17 {
 			continue
 		}
-		fields[14] = asciiItemInfoName("item", row.id)
-		fields[15] = asciiItemInfoName("name2", row.id)
 		out = append(out, strings.Join(fields, " "))
 	}
 	return strings.Join(out, "\r\n") + "\r\n"
@@ -495,6 +497,33 @@ func formatExtendedPVFItemInfoDAT(rawText string, equipment, stackable []shared.
 
 func asciiItemInfoName(prefix string, id int) string {
 	return "`" + prefix + "_" + strconv.Itoa(id) + "`"
+}
+
+// Taiwan Auction and Point consume ItemInfo names as Big5 bytes. Keep unsafe
+// names on an ASCII fallback so one unsupported rune cannot corrupt the file.
+func encodedItemInfoName(name, fallbackPrefix string, id int) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return asciiItemInfoName(fallbackPrefix, id)
+	}
+	encoded, err := charset.EncodeBig5String(name)
+	if err != nil || len(encoded) == 0 || len(encoded) > 120 {
+		return asciiItemInfoName(fallbackPrefix, id)
+	}
+	for _, b := range encoded {
+		if b == '`' || b < 0x20 || b == 0x7f {
+			return asciiItemInfoName(fallbackPrefix, id)
+		}
+	}
+	return "`" + string(encoded) + "`"
+}
+
+func unquoteItemInfoName(name string) string {
+	name = strings.TrimSpace(name)
+	if len(name) >= 2 && name[0] == '`' && name[len(name)-1] == '`' {
+		return name[1 : len(name)-1]
+	}
+	return name
 }
 
 func parsePVFItemInfoRows(text string) map[int][]string {
@@ -530,8 +559,8 @@ func generatedItemInfoFields(item shared.EquipmentCatalogItem, stackable bool) [
 	}
 	fields = append(fields,
 		strconv.Itoa(level),
-		asciiItemInfoName("item", item.ID),
-		asciiItemInfoName("name2", item.ID),
+		encodedItemInfoName(item.Name, "item", item.ID),
+		encodedItemInfoName(item.Name2, "name2", item.ID),
 		strconv.Itoa(generatedItemInfoCategory(item, stackable)),
 	)
 	return fields

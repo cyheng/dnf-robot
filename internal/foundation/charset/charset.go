@@ -1,6 +1,7 @@
 package charset
 
 import (
+	"fmt"
 	"unicode"
 	"unicode/utf8"
 
@@ -9,6 +10,14 @@ import (
 	"golang.org/x/text/encoding/traditionalchinese"
 	"golang.org/x/text/transform"
 )
+
+func EncodeBig5String(s string) ([]byte, error) {
+	encoded, _, err := transform.Bytes(traditionalchinese.Big5.NewEncoder(), []byte(s))
+	if err != nil {
+		return nil, fmt.Errorf("encode Big5: %w", err)
+	}
+	return encoded, nil
+}
 
 type textCodec struct {
 	name   string

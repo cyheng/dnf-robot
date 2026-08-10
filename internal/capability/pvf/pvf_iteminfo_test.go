@@ -1,9 +1,14 @@
 package pvf
 
 import (
-	"robot/internal/shared"
+	"bytes"
 	"strings"
 	"testing"
+
+	"golang.org/x/text/encoding/traditionalchinese"
+	"golang.org/x/text/transform"
+
+	"robot/internal/shared"
 )
 
 func TestFormatPVFItemInfoDAT(t *testing.T) {
@@ -54,16 +59,11 @@ func TestFormatExtendedPVFItemInfoDATKeepsRawAndGeneratesPVFItems(t *testing.T) 
 	if len(lines) != 13 {
 		t.Fatalf("lines = %d, want 13: %q", len(lines), got)
 	}
-	for _, b := range []byte(got) {
-		if b >= 0x80 {
-			t.Fatalf("extended iteminfo contains non-ASCII byte 0x%x: %q", b, got)
-		}
-	}
 	assertLineContains(t, lines, "2675336 ", "13002")
-	assertLineHasToken(t, lines, "2675336 ", 14, "`item_2675336`")
+	assertLineHasDecodedBig5Token(t, lines, "2675336 ", 14, "百萬金幣")
 	assertLineHasToken(t, lines, "2675336 ", 15, "`name2_2675336`")
 	assertLineContains(t, lines, "3100060 ", "12001")
-	assertLineHasToken(t, lines, "3100060 ", 14, "`item_3100060`")
+	assertLineHasDecodedBig5Token(t, lines, "3100060 ", 14, "無法編碼的名稱")
 	assertLineHasToken(t, lines, "3100060 ", 15, "`name2_3100060`")
 	assertLineHasToken(t, lines, "3100060 ", 13, "70")
 	if strings.Contains(got, "99999") || strings.Contains(got, "`raw`") {
@@ -90,6 +90,36 @@ func TestFormatExtendedPVFItemInfoDATKeepsRawAndGeneratesPVFItems(t *testing.T) 
 	assertLineContains(t, lines, "2610030 ", "33001")
 	assertLineContains(t, lines, "2700001 ", "33001")
 	assertLineContains(t, lines, "2700002 ", "33002")
+}
+
+func TestEncodedItemInfoNameUsesBig5AndFallsBackSafely(t *testing.T) {
+	got := encodedItemInfoName("粗布襯衫", "item", 10000)
+	if got == "`item_10000`" {
+		t.Fatal("Big5-compatible PVF name used the fallback")
+	}
+	decoded, _, err := transform.Bytes(traditionalchinese.Big5.NewDecoder(), []byte(strings.Trim(got, "`")))
+	if err != nil || string(decoded) != "粗布襯衫" {
+		t.Fatalf("decoded name = %q err=%v", decoded, err)
+	}
+	if got := encodedItemInfoName("emoji 🚀", "item", 7); got != "`item_7`" {
+		t.Fatalf("unencodable name = %q", got)
+	}
+	if got := encodedItemInfoName("bad`name", "item", 8); got != "`item_8`" {
+		t.Fatalf("structurally unsafe name = %q", got)
+	}
+	if got := encodedItemInfoName("鋼鐵亡靈長袍", "item", 10577); got != "`item_10577`" {
+		t.Fatalf("Big5 delimiter byte was not rejected: %q", got)
+	}
+	assertEncodedItemInfoName(t, "有空格 的名稱", 9)
+}
+
+func assertEncodedItemInfoName(t *testing.T, name string, id int) {
+	t.Helper()
+	got := encodedItemInfoName(name, "item", id)
+	decoded, _, err := transform.Bytes(traditionalchinese.Big5.NewDecoder(), []byte(strings.Trim(got, "`")))
+	if err != nil || string(decoded) != name {
+		t.Fatalf("encoded name %q decoded = %q, err=%v", name, decoded, err)
+	}
 }
 
 func TestApplyRawItemInfoSearchFieldsPreservesFineCategoryAndJobs(t *testing.T) {
@@ -175,6 +205,26 @@ func assertLineHasToken(t *testing.T, lines []string, prefix string, tokenIndex 
 			}
 			return
 		}
+	}
+	t.Fatalf("missing line prefix %q in %#v", prefix, lines)
+}
+
+func assertLineHasDecodedBig5Token(t *testing.T, lines []string, prefix string, tokenIndex int, want string) {
+	t.Helper()
+	for _, line := range lines {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		fields := strings.Fields(line)
+		if tokenIndex < 0 || tokenIndex >= len(fields) {
+			t.Fatalf("line %q has %d fields, missing token %d", line, len(fields), tokenIndex)
+		}
+		raw := bytes.Trim([]byte(fields[tokenIndex]), "`")
+		decoded, _, err := transform.Bytes(traditionalchinese.Big5.NewDecoder(), raw)
+		if err != nil || string(decoded) != want {
+			t.Fatalf("line %q token %d decoded = %q, want %q, err=%v", line, tokenIndex, decoded, want, err)
+		}
+		return
 	}
 	t.Fatalf("missing line prefix %q in %#v", prefix, lines)
 }
