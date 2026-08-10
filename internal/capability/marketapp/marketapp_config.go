@@ -32,7 +32,7 @@ func DefaultConfig() Config {
 		Collector:       CollectorCfg{Enabled: true, MaxConcurrent: 8, InRangeProbability: 0.8, OutRangeProbability: 0.05},
 		Restock: RestockCfg{
 			Comments: defaultRestockComments(), EquipmentAllowedRarities: defaultEquipmentRarities, OtherAllowedRarities: defaultOtherRarities,
-			EquipmentTradePolicy: tradePolicyPermissive, OtherTradePolicy: tradePolicyPermissive, StackSizes: []int{500, 1000, 2000},
+			EquipmentTradePolicy: tradePolicyPermissive, OtherTradePolicy: tradePolicyPermissive, EquipmentPriceProtection: equipmentPriceProtectionStandard, StackSizes: []int{500, 1000, 2000},
 			EquipmentQtyMin: 2, EquipmentQtyMax: 5, EquipInflateMin: 1, EquipInflateMax: 2,
 			LevelPriceRate: 0.15, RarityPriceRate: 0.30,
 			UpgradeMin: 7, UpgradeMax: 13, UpgradePriceRate: 0.08, RandLow: 0.9, RandHigh: 1.1,
@@ -96,6 +96,7 @@ func decodeMarketINI(ini *foundationconfig.INIConfig) (Config, error) {
 	}
 	c.Restock.EquipmentTradePolicy = ini.GetString("auction_price", "equipment_trade_policy", d.Restock.EquipmentTradePolicy)
 	c.Restock.OtherTradePolicy = ini.GetString("auction_price", "other_trade_policy", d.Restock.OtherTradePolicy)
+	c.Restock.EquipmentPriceProtection = strings.ToLower(strings.TrimSpace(ini.GetString("auction_price", "equipment_price_protection", d.Restock.EquipmentPriceProtection)))
 	c.Restock.BlockedItemIDs, err = decodeBlockedItemIDs(ini.GetString("auction_price", "blocked_item_ids", ""))
 	if err != nil {
 		return Config{}, err
@@ -160,6 +161,7 @@ func writeMarketConfig(path string, c Config) error {
 		"# 允许自动补货上架的其他物品稀有度数字，只允许 0 到 9。", "other_allowed_rarities = " + c.Restock.OtherAllowedRarities,
 		"# 装备交易策略：permissive 或 strict。", "equipment_trade_policy = " + c.Restock.EquipmentTradePolicy,
 		"# 其他物品交易策略：permissive 或 strict。", "other_trade_policy = " + c.Restock.OtherTradePolicy,
+		"# 装备异常价格保护：off、strict、standard 或 relaxed；按当前 PVF 自动统计同等级装备基础价格上限。", "equipment_price_protection = " + c.Restock.EquipmentPriceProtection,
 		"# 禁止自动或指定补货上架的物品 ID；支持逗号、空格、换行和 8-50 范围写法。", "blocked_item_ids = " + encodeBlockedItemIDs(c.Restock.BlockedItemIDs),
 		"# 始终允许上架的物品 ID；支持逗号、空格、换行和 8-50 范围写法，并优先于黑名单、稀有度、等级和交易策略过滤。", "allowed_item_ids = " + encodeAllowedItemIDs(c.Restock.AllowedItemIDs),
 		"# 堆叠物品的候选数量，使用逗号分隔；实际数量不会超过 PVF stack_limit。", "stack_sizes = " + joinInts(c.Restock.StackSizes),

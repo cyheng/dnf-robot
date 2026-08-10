@@ -92,8 +92,11 @@ func (p Paths) PartySkills() string { return categorizedPath(p.Templates, "party
 func (p Paths) PrivateKey() string { return categorizedPath(p.Keys, "privatekey.pem") }
 func (p Paths) PublicKey() string  { return categorizedPath(p.Keys, "publickey.pem") }
 
-func (p Paths) PVFManifest() string    { return categorizedPath(p.PVF, "pvf_manifest.json") }
-func (p Paths) PVFEquipment() string   { return categorizedPath(p.PVF, "equipment_catalog.json") }
+func (p Paths) PVFManifest() string  { return categorizedPath(p.PVF, "pvf_manifest.json") }
+func (p Paths) PVFEquipment() string { return categorizedPath(p.PVF, "equipment_catalog.json") }
+func (p Paths) PVFEquipmentPriceCaps() string {
+	return categorizedPath(p.PVF, "equipment_level_price_caps.json")
+}
 func (p Paths) PVFStackable() string   { return categorizedPath(p.PVF, "stackable_catalog.json") }
 func (p Paths) PVFMaps() string        { return categorizedPath(p.PVF, "map_catalog.json") }
 func (p Paths) PVFSkillStates() string { return categorizedPath(p.PVF, "skill_state_catalog.json") }

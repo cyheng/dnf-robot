@@ -32,6 +32,7 @@ type RestockCfg struct {
 	OtherAllowedRarities     string            `json:"other_allowed_rarities"`
 	EquipmentTradePolicy     string            `json:"equipment_trade_policy"`
 	OtherTradePolicy         string            `json:"other_trade_policy"`
+	EquipmentPriceProtection string            `json:"equipment_price_protection"`
 	BlockedItemIDs           []uint32          `json:"blocked_item_ids"`
 	AllowedItemIDs           []uint32          `json:"allowed_item_ids"`
 	StackSizes               []int             `json:"stack_sizes"`
@@ -156,6 +157,7 @@ type ConfigUpdateRequest struct {
 	OtherAllowedRarities     *string  `json:"other_allowed_rarities,omitempty"`
 	EquipmentTradePolicy     *string  `json:"equipment_trade_policy,omitempty"`
 	OtherTradePolicy         *string  `json:"other_trade_policy,omitempty"`
+	EquipmentPriceProtection *string  `json:"equipment_price_protection,omitempty"`
 	BlockedItemIDs           []uint32 `json:"blocked_item_ids,omitempty"`
 	BlockedItemIDExpression  *string  `json:"blocked_item_id_expression,omitempty"`
 	AllowedItemIDs           []uint32 `json:"allowed_item_ids,omitempty"`

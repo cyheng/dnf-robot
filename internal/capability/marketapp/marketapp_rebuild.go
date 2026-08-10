@@ -132,6 +132,9 @@ func (a *App) applyListingConfigLocked(req ConfigUpdateRequest) (Config, error) 
 	if req.OtherTradePolicy != nil {
 		cfg.Restock.OtherTradePolicy = strings.TrimSpace(*req.OtherTradePolicy)
 	}
+	if req.EquipmentPriceProtection != nil {
+		cfg.Restock.EquipmentPriceProtection = strings.ToLower(strings.TrimSpace(*req.EquipmentPriceProtection))
+	}
 	if req.BlockedItemIDExpression != nil {
 		blocked, err := decodeBlockedItemIDs(*req.BlockedItemIDExpression)
 		if err != nil {

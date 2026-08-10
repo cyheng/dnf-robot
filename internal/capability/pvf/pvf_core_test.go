@@ -82,12 +82,13 @@ func TestExtractPVFLevelExpStopsAtFirstDecrease(t *testing.T) {
 func TestPVFExportsCurrentInvalidatesOldSkillStateSchema(t *testing.T) {
 	dir := t.TempDir()
 	files := map[string][]byte{
-		"equipment_catalog.json": []byte(`[{"item_type": 20}]`),
-		"stackable_catalog.json": []byte(`[{"id": 1}]`),
-		"map_catalog.json":       []byte(`[{"normal_eligible":true,"store_eligible":true}]`),
-		pvfSkillStateExportName:  []byte(`[{"job": 1}]`),
-		pvfLevelExpExportName:    []byte(`[0,0,1000]`),
-		pvfItemInfoExportName:    []byte("iteminfo"),
+		"equipment_catalog.json":        []byte(`[{"item_type": 20}]`),
+		pvfEquipmentPriceCapsExportName: []byte(`{"version":1,"levels":[]}`),
+		"stackable_catalog.json":        []byte(`[{"id": 1}]`),
+		"map_catalog.json":              []byte(`[{"normal_eligible":true,"store_eligible":true}]`),
+		pvfSkillStateExportName:         []byte(`[{"job": 1}]`),
+		pvfLevelExpExportName:           []byte(`[0,0,1000]`),
+		pvfItemInfoExportName:           []byte("iteminfo"),
 	}
 	for name, data := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), data, 0644); err != nil {
@@ -139,6 +140,22 @@ func TestPVFExportsCurrentRequiresSourceMD5(t *testing.T) {
 	}
 	if pvfExportsCurrent(manifestPath, want, dir) {
 		t.Fatal("manifest without stored md5 was treated as current")
+	}
+}
+
+func TestPVFExportsCurrentRequiresEquipmentPriceCaps(t *testing.T) {
+	dir := t.TempDir()
+	writeCurrentPVFExportFiles(t, dir)
+	want := pvfManifest{Version: pvfExportVersion, SkillStateVersion: pvfSkillStateExportVersion, Source: "/game/Script.pvf", Size: 100, ModTime: 200, MD5: "abc"}
+	manifestPath := filepath.Join(dir, pvfManifestName)
+	if err := WriteJSON(manifestPath, want); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(dir, pvfEquipmentPriceCapsExportName)); err != nil {
+		t.Fatal(err)
+	}
+	if pvfExportsCurrent(manifestPath, want, dir) {
+		t.Fatal("PVF exports without equipment price caps were treated as current")
 	}
 }
 
@@ -327,12 +344,13 @@ func BenchmarkPVFExportsCurrentStreaming(b *testing.B) {
 	dir := b.TempDir()
 	large := bytes.Repeat([]byte{' '}, 2*1024*1024)
 	files := map[string][]byte{
-		pvfEquipmentExportName:  append([]byte(`{"item_type": 20}`), large...),
-		pvfStackableExportName:  append([]byte(`[{"id":1}]`), large...),
-		pvfMapExportName:        append([]byte(`{"normal_eligible":true,"store_eligible":true}`), large...),
-		pvfSkillStateExportName: []byte(`[{"job":1}]`),
-		pvfLevelExpExportName:   []byte(`[0,0,1000]`),
-		pvfItemInfoExportName:   []byte("iteminfo"),
+		pvfEquipmentExportName:          append([]byte(`{"item_type": 20}`), large...),
+		pvfEquipmentPriceCapsExportName: []byte(`{"version":1,"levels":[]}`),
+		pvfStackableExportName:          append([]byte(`[{"id":1}]`), large...),
+		pvfMapExportName:                append([]byte(`{"normal_eligible":true,"store_eligible":true}`), large...),
+		pvfSkillStateExportName:         []byte(`[{"job":1}]`),
+		pvfLevelExpExportName:           []byte(`[0,0,1000]`),
+		pvfItemInfoExportName:           []byte("iteminfo"),
 	}
 	for name, data := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), data, 0644); err != nil {
@@ -356,12 +374,13 @@ func BenchmarkPVFExportsCurrentStreaming(b *testing.B) {
 func writeCurrentPVFExportFiles(t *testing.T, dir string) {
 	t.Helper()
 	files := map[string][]byte{
-		"equipment_catalog.json": []byte(`[{"item_type": 20}]`),
-		"stackable_catalog.json": []byte(`[{"id": 1}]`),
-		"map_catalog.json":       []byte(`[{"normal_eligible":true,"store_eligible":true}]`),
-		pvfSkillStateExportName:  []byte(`[{"job": 1, "skill_index": 1, "state": 1}]`),
-		pvfLevelExpExportName:    []byte(`[0,0,1000]`),
-		pvfItemInfoExportName:    []byte("iteminfo"),
+		"equipment_catalog.json":        []byte(`[{"item_type": 20}]`),
+		pvfEquipmentPriceCapsExportName: []byte(`{"version":1,"levels":[]}`),
+		"stackable_catalog.json":        []byte(`[{"id": 1}]`),
+		"map_catalog.json":              []byte(`[{"normal_eligible":true,"store_eligible":true}]`),
+		pvfSkillStateExportName:         []byte(`[{"job": 1, "skill_index": 1, "state": 1}]`),
+		pvfLevelExpExportName:           []byte(`[0,0,1000]`),
+		pvfItemInfoExportName:           []byte("iteminfo"),
 	}
 	for name, data := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), data, 0644); err != nil {

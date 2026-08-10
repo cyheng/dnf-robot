@@ -37,6 +37,7 @@ func (a *App) auctionUnitPriceFor(item catalogItem, base int32, batchInflate flo
 	if base <= 0 {
 		base = 1000
 	}
+	base = a.protectedEquipmentBasePrice(item, base)
 	price := float64(base) * auctionQualityPriceFactor(item, cfg.Restock)
 	if item.Kind == "equipment" {
 		if batchInflate <= 0 {
@@ -80,7 +81,7 @@ func (a *App) auctionPriceBounds(item catalogItem) (int32, int32) {
 	if priceRange, ok := a.customPriceRange(item.ItemID); ok {
 		return priceRange.MinPrice, priceRange.MaxPrice
 	}
-	base := float64(marketBasePrice(item))
+	base := float64(a.protectedEquipmentBasePrice(item, marketBasePrice(item)))
 	cfg := a.configSnapshot()
 	base *= auctionQualityPriceFactor(item, cfg.Restock)
 	lowRand, highRand := cfg.Restock.RandLow, cfg.Restock.RandHigh

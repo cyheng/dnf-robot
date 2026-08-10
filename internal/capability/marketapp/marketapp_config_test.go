@@ -34,7 +34,7 @@ func TestLoadConfigCreatesCommentedINIInConfDirectory(t *testing.T) {
 	if !strings.Contains(text, "[auction_price]") || !strings.Contains(text, "# 装备基础价格的最小随机倍率。") {
 		t.Fatalf("generated INI lacks documented pricing configuration:\n%s", text)
 	}
-	if !strings.Contains(text, "equipment_allowed_rarities = 012345") || !strings.Contains(text, "other_allowed_rarities = 012345") || !strings.Contains(text, "equipment_trade_policy = permissive") || !strings.Contains(text, "other_trade_policy = permissive") {
+	if !strings.Contains(text, "equipment_allowed_rarities = 012345") || !strings.Contains(text, "other_allowed_rarities = 012345") || !strings.Contains(text, "equipment_trade_policy = permissive") || !strings.Contains(text, "other_trade_policy = permissive") || !strings.Contains(text, "equipment_price_protection = standard") {
 		t.Fatalf("generated INI does not use the default listed rarity digits:\n%s", text)
 	}
 	if !strings.Contains(text, "blocked_item_ids = ") {
@@ -109,6 +109,7 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Restock.BlockedItemIDs = []uint32{100, 300}
 	cfg.Restock.AllowedItemIDs = []uint32{200, 400}
+	cfg.Restock.EquipmentPriceProtection = equipmentPriceProtectionStrict
 	if err := writeMarketConfig(path, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -121,6 +122,17 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	}
 	if got := loaded.Restock.AllowedItemIDs; len(got) != 2 || got[0] != 200 || got[1] != 400 {
 		t.Fatalf("allowed item IDs = %v, want [200 400]", got)
+	}
+	if loaded.Restock.EquipmentPriceProtection != equipmentPriceProtectionStrict {
+		t.Fatalf("equipment price protection = %q, want strict", loaded.Restock.EquipmentPriceProtection)
+	}
+}
+
+func TestMarketConfigRejectsInvalidEquipmentPriceProtection(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Restock.EquipmentPriceProtection = "maximum"
+	if err := validateMarketConfig(cfg); err == nil || !strings.Contains(err.Error(), "equipment_price_protection") {
+		t.Fatalf("invalid equipment price protection error = %v", err)
 	}
 }
 

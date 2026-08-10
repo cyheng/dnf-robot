@@ -40,6 +40,23 @@ type EquipmentCatalogItem struct {
 	ClientIncompatible bool `json:"client_incompatible,omitempty"`
 }
 
+type EquipmentLevelPriceCapsDocument struct {
+	Version int                      `json:"version"`
+	Method  string                   `json:"method"`
+	Levels  []EquipmentLevelPriceCap `json:"levels"`
+}
+
+type EquipmentLevelPriceCap struct {
+	Level       int   `json:"level"`
+	Samples     int   `json:"samples"`
+	Median      int64 `json:"median"`
+	Q1          int64 `json:"q1"`
+	Q3          int64 `json:"q3"`
+	StrictCap   int64 `json:"strict_cap"`
+	StandardCap int64 `json:"standard_cap"`
+	RelaxedCap  int64 `json:"relaxed_cap"`
+}
+
 // ClientCompatibleEquipment reports whether generated equipment may be sent
 // to this DP2 client. Keep compatibility policy separate from consumer-specific
 // eligibility rules so every equipment path honors the same PVF marker.

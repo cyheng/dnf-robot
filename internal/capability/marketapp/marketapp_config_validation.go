@@ -86,6 +86,9 @@ func validateMarketConfig(cfg Config) error {
 	if r.OtherTradePolicy != tradePolicyPermissive && r.OtherTradePolicy != tradePolicyStrict {
 		return fmt.Errorf("auction_price.other_trade_policy must be permissive or strict")
 	}
+	if !validEquipmentPriceProtection(r.EquipmentPriceProtection) {
+		return fmt.Errorf("auction_price.equipment_price_protection must be off, strict, standard, or relaxed")
+	}
 	if err := validateConfiguredItemIDs("blocked_item_ids", r.BlockedItemIDs); err != nil {
 		return err
 	}
