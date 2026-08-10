@@ -44,4 +44,7 @@ func TestClearSystemMarketStockDeletesDBRowsAndResetsQueues(t *testing.T) {
 	if repo.collectCalls != 0 {
 		t.Fatalf("system stock clear used collect path, calls=%d", repo.collectCalls)
 	}
+	if len(repo.averageDeletes) != 0 {
+		t.Fatalf("standalone system stock clear deleted average prices: %v", repo.averageDeletes)
+	}
 }

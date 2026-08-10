@@ -65,6 +65,8 @@ type clearStockRepository struct {
 	ensureCalls       int
 	ensureTables      []string
 	ensureErr         error
+	averageCounts     map[string]int
+	averageDeletes    []string
 }
 
 type creatureCreateCall struct {
@@ -127,6 +129,13 @@ func (r *clearStockRepository) CountSystemStock(dbName string, _ uint32) (int, e
 func (r *clearStockRepository) DeleteSystemStock(dbName string, _ uint32) (int64, error) {
 	count := r.counts[dbName]
 	r.counts[dbName] = 0
+	return int64(count), nil
+}
+
+func (r *clearStockRepository) DeleteAveragePrices(dbName string) (int64, error) {
+	r.averageDeletes = append(r.averageDeletes, dbName)
+	count := r.averageCounts[dbName]
+	r.averageCounts[dbName] = 0
 	return int64(count), nil
 }
 

@@ -205,6 +205,18 @@ func (r SQLRepository) DeleteSystemStock(dbName string, systemOwnerBase uint32) 
 	return res.RowsAffected()
 }
 
+func (r SQLRepository) DeleteAveragePrices(dbName string) (int64, error) {
+	query := fmt.Sprintf("DELETE FROM %s.`auction_average_price`", quoteIdent(dbName))
+	res, err := r.db.Exec(query)
+	if err != nil {
+		if isMissingTable(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func (a *App) appendCollectActions(rows []collectRow, result *PlanResult) {
 	cfg := a.configSnapshot()
 	for i, row := range rows {

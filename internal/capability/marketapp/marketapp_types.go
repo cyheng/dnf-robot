@@ -137,8 +137,9 @@ type PVFUpgradeSeparateRequest struct {
 }
 
 type ClearSystemStockResult struct {
-	Markets []ClearSystemMarketResult `json:"markets"`
-	Deleted int64                     `json:"deleted"`
+	Markets             []ClearSystemMarketResult `json:"markets"`
+	Deleted             int64                     `json:"deleted"`
+	AveragePriceDeleted int64                     `json:"average_price_deleted,omitempty"`
 }
 
 type ClearSystemMarketResult struct {

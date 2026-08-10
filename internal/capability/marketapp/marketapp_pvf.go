@@ -185,8 +185,21 @@ func (a *App) prepareItemInfoRelease() error {
 	}
 	a.jobMu.Lock()
 	defer a.jobMu.Unlock()
-	if _, err := a.clearSystemMarketStockLocked("iteminfo_prepare"); err != nil {
+	const logType = "iteminfo_prepare"
+	if _, err := a.clearSystemMarketStockLocked(logType); err != nil {
 		return err
+	}
+	cfg := a.configSnapshot()
+	for _, market := range []struct {
+		name string
+		db   string
+	}{
+		{name: marketNameAuction, db: cfg.AuctionDB},
+		{name: marketNameCera, db: cfg.CeraDB},
+	} {
+		if _, err := a.deleteAveragePrices(logType, market.name, market.db); err != nil {
+			return err
+		}
 	}
 	a.resetAuctionQueues()
 	a.resetCeraRejected()
@@ -303,6 +316,15 @@ func (a *App) deleteSystemMarketStock(logType, market, dbName string) (ClearSyst
 	result.After = after
 	result.Status = marketLogStatusDBDeleted
 	return result, nil
+}
+
+func (a *App) deleteAveragePrices(logType, market, dbName string) (int64, error) {
+	deleted, err := a.repository.DeleteAveragePrices(dbName)
+	if err != nil {
+		return 0, fmt.Errorf("%s delete average prices: %w", market, err)
+	}
+	a.appendLog(LogEvent{Type: logType, Market: market, Status: marketLogStatusDBDeleted, Message: fmt.Sprintf("average_price_rows=%d", deleted)})
+	return deleted, nil
 }
 
 func (a *App) waitSystemStockEmpty(logType, market, dbName string, timeout time.Duration) error {

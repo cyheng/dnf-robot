@@ -101,6 +101,11 @@ func (a *App) clearSystemAuctionStockLocked(logType string) (ClearSystemStockRes
 	item, err = a.deleteSystemCreatureItems(logType)
 	result.Markets = append(result.Markets, item)
 	result.Deleted += item.Deleted
+	if err != nil {
+		return result, err
+	}
+	deleted, err := a.deleteAveragePrices(logType, marketNameAuction, cfg.AuctionDB)
+	result.AveragePriceDeleted += deleted
 	return result, err
 }
 
