@@ -31,8 +31,26 @@ func TestEquipmentFormulaBoundsIncludeMultiplierUpgradeAndRandomRate(t *testing.
 	app.cfg.Restock.UpgradePriceRate = 0.08
 
 	low, high := app.auctionPriceBounds(catalogItem{ItemID: 31056, Kind: "equipment", Slot: "weapon", Price: 1000})
-	if low != 7020 || high != 17952 {
-		t.Fatalf("formula bounds=%d..%d want 7020..17952", low, high)
+	if low != 7020 || high != 24287 {
+		t.Fatalf("formula bounds=%d..%d want 7020..24287", low, high)
+	}
+}
+
+func TestUpgradePriceFactorIsLinearThroughTenAndAddsRiskPremiumAboveTen(t *testing.T) {
+	tests := []struct {
+		upgrade int
+		want    float64
+	}{
+		{upgrade: 7, want: 1.56},
+		{upgrade: 10, want: 1.80},
+		{upgrade: 11, want: 1.96},
+		{upgrade: 12, want: 2.28},
+		{upgrade: 13, want: 2.76},
+	}
+	for _, tt := range tests {
+		if got := auctionUpgradePriceFactor(tt.upgrade, 0.08); got < tt.want-1e-9 || got > tt.want+1e-9 {
+			t.Errorf("upgrade +%d factor=%v want %v", tt.upgrade, got, tt.want)
+		}
 	}
 }
 

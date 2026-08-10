@@ -173,7 +173,7 @@ func writeMarketConfig(path string, c Config) error {
 		"# 物品每提高 1 级稀有度相对基础价格增加的比例；0.3 表示增加 30%。", "rarity_price_rate = " + formatFloat(c.Restock.RarityPriceRate),
 		"# 装备随机强化的最低等级。", fmt.Sprintf("upgrade_min = %d", c.Restock.UpgradeMin),
 		"# 装备随机强化的最高等级。", fmt.Sprintf("upgrade_max = %d", c.Restock.UpgradeMax),
-		"# 每级强化的价格加成比例；0.08 表示每级增加 8%。", "upgrade_price_rate = " + formatFloat(c.Restock.UpgradePriceRate),
+		"# 每级强化的价格加成比例；+10 以上还会使用同一比例叠加二次增长的损坏风险溢价。", "upgrade_price_rate = " + formatFloat(c.Restock.UpgradePriceRate),
 		"# 最终价格的最小随机倍率。", "rand_low = " + formatFloat(c.Restock.RandLow),
 		"# 最终价格的最大随机倍率。", "rand_high = " + formatFloat(c.Restock.RandHigh),
 		"# 是否启用 conf/market_item_price_ranges.json 中的物品独立最终价格范围；有效配置优先于上面的通用公式。", "custom_price_enabled = " + strconv.FormatBool(c.Restock.CustomPriceEnabled),

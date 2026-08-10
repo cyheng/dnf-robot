@@ -253,7 +253,7 @@ func defaultRestockComments() map[string]string {
 		"equipment_inflate_max": "Upper equipment base price multiplier. PVF price/value remains the base.",
 		"upgrade_min":           "Minimum random equipment upgrade value written to the auction packet.",
 		"upgrade_max":           "Maximum random equipment upgrade value written to the auction packet.",
-		"upgrade_price_rate":    "Additional equipment price rate per upgrade level.",
+		"upgrade_price_rate":    "Additional equipment price rate per upgrade level; levels above +10 also add a quadratic risk premium using this rate.",
 		"rand_low":              "Final random price multiplier lower bound for both stackable and equipment listings.",
 		"rand_high":             "Final random price multiplier upper bound for both stackable and equipment listings.",
 		"max_actions":           "Maximum register packets per restock round. Default is 10000; use 0 only when a caller intentionally wants the full DB gap.",

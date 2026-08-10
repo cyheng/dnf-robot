@@ -43,7 +43,7 @@ func (a *App) auctionUnitPriceFor(item catalogItem, base int32, batchInflate flo
 			batchInflate = 1
 		}
 		price *= batchInflate
-		price *= 1 + float64(upgrade)*cfg.Restock.UpgradePriceRate
+		price *= auctionUpgradePriceFactor(upgrade, cfg.Restock.UpgradePriceRate)
 	}
 	low, high := cfg.Restock.RandLow, cfg.Restock.RandHigh
 	if low > 0 && high > 0 && low != high {
@@ -95,11 +95,23 @@ func (a *App) auctionPriceBounds(item catalogItem) (int32, int32) {
 		low = base * float64(cfg.Restock.EquipInflateMin) * lowRand
 		high = base * float64(cfg.Restock.EquipInflateMax) * highRand
 		if auctionEquipmentCanUpgrade(item) {
-			low *= 1 + float64(cfg.Restock.UpgradeMin)*cfg.Restock.UpgradePriceRate
-			high *= 1 + float64(cfg.Restock.UpgradeMax)*cfg.Restock.UpgradePriceRate
+			low *= auctionUpgradePriceFactor(cfg.Restock.UpgradeMin, cfg.Restock.UpgradePriceRate)
+			high *= auctionUpgradePriceFactor(cfg.Restock.UpgradeMax, cfg.Restock.UpgradePriceRate)
 		}
 	}
 	return boundedAuctionPrice(low), boundedAuctionPrice(high)
+}
+
+func auctionUpgradePriceFactor(upgrade int, rate float64) float64 {
+	if upgrade < 0 {
+		upgrade = 0
+	}
+	effectiveLevels := upgrade
+	if upgrade > 10 {
+		riskLevels := upgrade - 10
+		effectiveLevels += riskLevels * riskLevels
+	}
+	return 1 + float64(effectiveLevels)*rate
 }
 
 func auctionQualityPriceFactor(item catalogItem, cfg RestockCfg) float64 {
