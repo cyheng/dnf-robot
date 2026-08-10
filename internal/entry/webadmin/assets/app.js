@@ -62,8 +62,9 @@ function marketRuleSummary(){
  return rules.map(rule=>'<section><h5>'+escapeHTML(rule[0])+'</h5><p>'+escapeHTML(rule[1])+'</p></section>').join('')
 }
 function equipmentPriceProtectionOptions(value){
- const options=[['off',marketText('Off - Do not limit PVF prices','关闭 - 不限制 PVF 价格')],['strict',marketText('Strict - Cap noticeably high prices','严格 - 限制明显偏高价格')],['standard',marketText('Standard - Cap abnormal prices (Recommended)','标准 - 限制异常高价（推荐）')],['relaxed',marketText('Relaxed - Only cap extreme prices','宽松 - 仅限制极端高价')]];
- return '<select class="market-protection-select" id="marketEquipmentPriceProtection">'+options.map(option=>'<option value="'+option[0]+'" '+(value===option[0]?'selected':'')+'>'+escapeHTML(option[1])+'</option>').join('')+'</select>'
+ const options=[['off',marketText('Off','关闭保护')],['strict',marketText('Strict cap','严格限价')],['standard',marketText('Standard cap','标准限价')],['relaxed',marketText('Relaxed cap','宽松限价')]];
+ const help=marketText('Off: no PVF limit. Strict: cap noticeably high prices. Standard: cap abnormal prices (recommended). Relaxed: cap only extreme prices.','关闭：不限制 PVF 价格；严格：限制明显偏高价格；标准：限制异常高价（推荐）；宽松：仅限制极端高价。');
+ return '<select class="market-policy-select" id="marketEquipmentPriceProtection" title="'+escapeHTML(help)+'">'+options.map(option=>'<option value="'+option[0]+'" '+(value===option[0]?'selected':'')+'>'+escapeHTML(option[1])+'</option>').join('')+'</select>'
 }
 function marketNumber(id,value,min,max,step){return '<input id="'+id+'" type="number" min="'+min+'" max="'+max+'" step="'+(step||1)+'" value="'+escapeHTML(value)+'">'}
 function marketField(control,unit){return '<div class="market-field">'+control+(unit?'<span>'+escapeHTML(unit)+'</span>':'')+'</div>'}

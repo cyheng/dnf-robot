@@ -15,7 +15,7 @@ func TestEmbeddedWebAssetsContainRequiredContent(t *testing.T) {
 	}{
 		{name: "login", content: loginHTML, required: []string{"Robot Web", `action="/login"`, "{{if .Error}}", i18nJSPlaceholder, `id="languageButton"`}},
 		{name: "index", content: indexHTML, required: []string{"TW Robot Web", appCSSPlaceholder, i18nJSPlaceholder, appJSPlaceholder, `id="languageButton"`, `id="partyCompatButton"`, `id="compatButton"`}},
-		{name: "css", content: appCSS, required: []string{":root{", ".service-lights", ".diagrow", ".market-policy-select", ".market-protection-select", ".market-rule-article", ".market-rule-details", ".market-rule-chevrons"}},
+		{name: "css", content: appCSS, required: []string{":root{", ".service-lights", ".diagrow", ".market-policy-select", ".market-rule-article", ".market-rule-details", ".market-rule-chevrons"}},
 		{name: "i18n", content: i18nJS, required: []string{"I18N_MESSAGES", "tw_language", "toggleLanguage", "currentLanguage=localStorage.getItem(I18N_STORAGE_KEY)==='zh'?'zh':'en'", "auto.shout_interval", "喊话间隔", "validation.shout_interval", "market.section_status", "market.price_range_policy", "market.allowed_rarities", "上架稀有度（0-9）", "范围外回收概率"}},
 		{name: "javascript", content: appJS, required: []string{"async function api(", "openPartyCompatDialog", "openCompatDialog", "openDiagnosticsDialog", "restartRobot", "autoMailNotify", "autoShoutMin", "autoShoutMax", "auto.auto_shout_interval_min_sec", "auto.auto_shout_interval_max_sec", "marketEquipmentRarities", "marketOtherRarities", "marketBlockedItemIDs", "parseBlockedItemIDExpression", "formatBlockedItemIDs", "marketAllowedItemIDs", "parseAllowedItemIDExpression", "formatAllowedItemIDs", "allowed_item_id_expression", "Allowed item IDs", "物品 ID 白名单", "normalizeRarityDigits", "equipment_allowed_rarities", "other_allowed_rarities", "blocked_item_id_expression", "marketEquipmentLevelMin", "marketLevelPriceRate", "marketRarityPriceRate", "level_price_rate", "rarity_price_rate", "每5级价格增幅", "Price increase / 5 levels", "每级稀有度价格增幅", "Price increase / rarity", "Base upgrade price rate", "基础强化加价率", "equipment-loss risk premium", "损坏风险溢价", "equipment_trade_policy", "other_trade_policy", "marketInRangeProbability", "marketApplyListingConfig", "marketKindsProgress", "种类（实际 / 预期）"}},
 	}
@@ -52,10 +52,12 @@ func TestMarketPricingAndRuleSummaryAreBilingual(t *testing.T) {
 		"total price divided by quantity", "总价除以数量得到单价",
 		"Equipment price protection", "装备异常价格保护",
 		"equipment_price_protection", "marketEquipmentPriceProtection",
-		"Off - Do not limit PVF prices", "关闭 - 不限制 PVF 价格",
-		"Strict - Cap noticeably high prices", "严格 - 限制明显偏高价格",
-		"Standard - Cap abnormal prices (Recommended)", "标准 - 限制异常高价（推荐）",
-		"Relaxed - Only cap extreme prices", "宽松 - 仅限制极端高价",
+		"'Off'", "关闭保护",
+		"Strict cap", "严格限价",
+		"Standard cap", "标准限价",
+		"Relaxed cap", "宽松限价",
+		"Off: no PVF limit", "关闭：不限制 PVF 价格",
+		`class="market-policy-select" id="marketEquipmentPriceProtection"`,
 		"Per-level base-price limits are calculated automatically", "系统根据当前 PVF 中同等级装备的价格分布自动计算基础价格上限",
 	} {
 		if !strings.Contains(appJS, want) {
