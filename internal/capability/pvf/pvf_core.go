@@ -764,6 +764,8 @@ func equipmentWeaponCategorySuffix(parts []string, item shared.EquipmentCatalogI
 			return 3
 		case "wand":
 			return 4
+		case "tonfa":
+			return 6
 		case "beamsword":
 			return 6
 		}

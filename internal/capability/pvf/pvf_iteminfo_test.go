@@ -43,6 +43,7 @@ func TestFormatExtendedPVFItemInfoDATKeepsRawAndGeneratesPVFItems(t *testing.T) 
 		{ID: 101030240, ItemType: 1, Slot: "weapon", ClientIncompatible: true},
 		{ID: 3100060, Name: "無法編碼的名稱", Name2: "无法编码的名称", Level: 90, Rarity: 4, ItemType: 8, Slot: "amulet", Path: "equipment/ancient/halin/3100060.equ"},
 		{ID: 35500001, Level: 90, Rarity: 4, ItemType: 1, Slot: "weapon", SubType: 3, Path: "equipment/character/fighter/weapon/boxglove/35500001.equ", UseJob: []int{1, 7}},
+		{ID: 102040405, Level: 85, Rarity: 4, ItemType: 1, Slot: "weapon", SubType: 5, Path: "equipment/character/fighter/weapon/tonfa/102040405.equ"},
 		{ID: 28237, Level: 85, Rarity: 4, ItemType: 1, Slot: "weapon", SubType: 3, Path: "equipment/character/swordman/weapon/beamsword/28237.equ"},
 		{ID: 37603, Level: 85, Rarity: 4, ItemType: 1, Slot: "weapon", SubType: 1, Path: "equipment/character/thief/weapon/wand/37603.equ"},
 		{ID: 37604, Level: 85, Rarity: 4, ItemType: 1, Slot: "weapon", SubType: 1, Path: "equipment/character/thief/weapon/twinsword/37604.equ"},
@@ -56,8 +57,8 @@ func TestFormatExtendedPVFItemInfoDATKeepsRawAndGeneratesPVFItems(t *testing.T) 
 		{ID: 2700002, Level: 1, Rarity: 2, Slot: "expert town potion", Path: "stackable/professional/puppet/new_puppet.stk"},
 	})
 	lines := strings.Split(strings.TrimSpace(got), "\r\n")
-	if len(lines) != 13 {
-		t.Fatalf("lines = %d, want 13: %q", len(lines), got)
+	if len(lines) != 14 {
+		t.Fatalf("lines = %d, want 14: %q", len(lines), got)
 	}
 	assertLineContains(t, lines, "2675336 ", "13002")
 	assertLineHasDecodedBig5Token(t, lines, "2675336 ", 14, "百萬金幣")
@@ -73,6 +74,7 @@ func TestFormatExtendedPVFItemInfoDATKeepsRawAndGeneratesPVFItems(t *testing.T) 
 		t.Fatalf("client-incompatible equipment survived iteminfo filtering: %q", got)
 	}
 	assertLineContains(t, lines, "35500001 ", "10205")
+	assertLineContains(t, lines, "102040405 ", "10206")
 	assertLineHasToken(t, lines, "35500001 ", 2, "0")
 	assertLineHasToken(t, lines, "35500001 ", 3, "1")
 	assertLineHasToken(t, lines, "35500001 ", 9, "1")
