@@ -60,10 +60,7 @@ func strictTradeBlocked(item catalogItem) bool {
 		if attach == "free" {
 			return false
 		}
-		// Normal sealed equipment is emitted with item type 1. Special auction
-		// records use their own item type (title/creature/artifact), so they
-		// cannot safely use the sealing exception.
-		return attach != "sealing" || specialAuctionKind(item) != ""
+		return attach != "sealing"
 	}
 	// Stackable strict mode has no safe per-instance sealing state; only the
 	// unbound PVF attach type is guaranteed to remain tradeable.

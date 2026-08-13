@@ -148,7 +148,11 @@ func TestStrictTradePolicyMatchesNativeAttachRules(t *testing.T) {
 		{name: "trade-delete material", item: catalogItem{ItemID: 4, Kind: "stackable", Attach: "trade delete"}, want: false},
 		{name: "trade-limit material", item: catalogItem{ItemID: 5, Kind: "stackable", Attach: "trade limit"}, want: false},
 		{name: "free material", item: catalogItem{ItemID: 6, Kind: "stackable", Attach: "free"}, want: true},
-		{name: "sealed special equipment", item: catalogItem{ItemID: 7, Kind: "equipment", Attach: "sealing", ItemType: 2, Slot: "title"}, want: false},
+		{name: "sealed title", item: catalogItem{ItemID: 7, Kind: "equipment", Attach: "sealing", ItemType: 2, Slot: "title"}, want: true},
+		{name: "sealed creature", item: catalogItem{ItemID: 8, Kind: "equipment", Attach: "sealing", ItemType: 30, Slot: "creature"}, want: true},
+		{name: "sealed red artifact", item: catalogItem{ItemID: 9, Kind: "equipment", Attach: "sealing", ItemType: 31, Slot: "artifact red"}, want: true},
+		{name: "sealed blue artifact", item: catalogItem{ItemID: 10, Kind: "equipment", Attach: "sealing", ItemType: 32, Slot: "artifact blue"}, want: true},
+		{name: "sealed green artifact", item: catalogItem{ItemID: 11, Kind: "equipment", Attach: "sealing", ItemType: 33, Slot: "artifact green"}, want: true},
 	}
 	for _, tt := range cases {
 		if got := marketListingAllowedWithConfig(tt.item, cfg); got != tt.want {
