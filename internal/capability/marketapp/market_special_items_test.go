@@ -23,11 +23,11 @@ func TestPlanAuctionHandlesNonCreatureSpecialTypesWithUniqueAddInfo(t *testing.T
 	}
 }
 
-func TestPlanAuctionKeepsPetArtifactItemType(t *testing.T) {
+func TestPlanAuctionWritesPetArtifactSealFlag(t *testing.T) {
 	app := testApp(t)
 	result := &PlanResult{}
 	catalog := map[uint32]catalogItem{
-		63500: {ItemID: 63500, Kind: "equipment", ItemType: 31, Slot: "artifact red", Attach: "trade", Price: 100},
+		63500: {ItemID: 63500, Kind: "equipment", ItemType: 31, Slot: "artifact red", Attach: "sealing", Price: 100},
 	}
 	app.planAuction([]restockRow{{ItemID: 63500, Quantity: 1, Enabled: true}}, catalog, map[uint32]int{}, map[uint32]int{}, result)
 
@@ -35,8 +35,35 @@ func TestPlanAuctionKeepsPetArtifactItemType(t *testing.T) {
 		t.Fatalf("artifact plan actions=%#v skipped=%#v", result.Actions, result.Skipped)
 	}
 	action := result.Actions[0]
-	if action.Kind != "artifact red" || action.ItemType != 31 {
+	if action.Kind != "artifact red" || action.ItemType != 1 {
 		t.Fatalf("unexpected artifact action: %#v", action)
+	}
+}
+
+func TestPlanAuctionWritesSpecialEquipmentSealFlagFromAttach(t *testing.T) {
+	cases := []struct {
+		name string
+		item catalogItem
+	}{
+		{name: "title", item: catalogItem{ItemID: 2001, Kind: "equipment", ItemType: 2, Slot: "title name", Attach: "sealing", Price: 100}},
+		{name: "creature", item: catalogItem{ItemID: 3001, Kind: "equipment", ItemType: 30, Slot: "creature", Attach: "sealing", Price: 100}},
+		{name: "artifact", item: catalogItem{ItemID: 63500, Kind: "equipment", ItemType: 31, Slot: "artifact red", Attach: "sealing", Price: 100}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			app := testApp(t)
+			if specialAuctionKind(tt.item) == "creature" {
+				app.repository = &clearStockRepository{creatureIDs: []int32{4567}}
+			}
+			result := &PlanResult{}
+			app.planAuction(
+				[]restockRow{{ItemID: tt.item.ItemID, Quantity: 1, Enabled: true}},
+				map[uint32]catalogItem{tt.item.ItemID: tt.item}, map[uint32]int{}, map[uint32]int{}, result,
+			)
+			if len(result.Actions) != 1 || result.Actions[0].ItemType != 1 {
+				t.Fatalf("sealed special action=%#v skipped=%#v", result.Actions, result.Skipped)
+			}
+		})
 	}
 }
 

@@ -436,6 +436,22 @@ func TestPlanAuctionEquipmentProtocolTypeUsesSealFlag(t *testing.T) {
 	}
 }
 
+func TestAuctionEquipmentProtocolTypeUsesSealFlagForSpecialEquipment(t *testing.T) {
+	for _, item := range []catalogItem{
+		{Kind: "equipment", ItemType: 2, Slot: "title", Attach: "sealing"},
+		{Kind: "equipment", ItemType: 30, Slot: "creature", Attach: "sealing"},
+		{Kind: "equipment", ItemType: 31, Slot: "artifact red", Attach: "sealing"},
+	} {
+		if got := auctionEquipmentProtocolItemType(item); got != 1 {
+			t.Fatalf("sealed special protocol item_type = %d, want seal flag 1 for %#v", got, item)
+		}
+		item.Attach = "trade"
+		if got := auctionEquipmentProtocolItemType(item); got != 0 {
+			t.Fatalf("unsealed special protocol item_type = %d, want seal flag 0 for %#v", got, item)
+		}
+	}
+}
+
 func TestAuctionPlanHelpersKeepFilteringAndBatchRules(t *testing.T) {
 	if reason := auctionPlanSkipReason(restockRow{}, catalogItem{Kind: "blocked"}); reason != "not_auctionable" {
 		t.Fatalf("blocked skip reason = %q", reason)

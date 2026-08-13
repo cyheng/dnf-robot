@@ -124,3 +124,21 @@ func TestBuildDirectRegisterPacketPreservesEquipFields(t *testing.T) {
 		t.Fatalf("unit price = %d, want 123", got)
 	}
 }
+
+func TestBuildDirectRegisterPacketWritesSealFlag(t *testing.T) {
+	packet, err := buildDirectRegisterPacket(MarketDirectRegisterItemRequest{
+		CID:            90000001,
+		OwnerID:        90000001,
+		ItemID:         2001,
+		CountOrAddInfo: 210000000,
+		ItemType:       1,
+		StartPrice:     999,
+		InstantPrice:   1000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := packet[0x30]; got != 1 {
+		t.Fatalf("seal flag = %d, want 1", got)
+	}
+}

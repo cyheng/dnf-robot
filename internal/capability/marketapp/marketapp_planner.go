@@ -222,12 +222,9 @@ func auctionEquipmentCanUpgrade(item catalogItem) bool {
 }
 
 func auctionEquipmentProtocolItemType(item catalogItem) int {
-	if specialAuctionKind(item) != "" {
-		return item.ItemType
-	}
 	// df_game_r's native trade check accepts attach type sealing only when
 	// Inven_Item byte 0 is 1. This protocol field lands in auction_main's
-	// seal_flag and reconstructs that byte for ordinary equipment.
+	// seal_flag and reconstructs that byte for all equipment kinds.
 	if auctionEquipmentShouldSeal(item) {
 		return 1
 	}
@@ -310,7 +307,7 @@ func (a *App) planSpecialAuction(row restockRow, item catalogItem, special strin
 			Market:       marketNameAuction,
 			Kind:         special,
 			ItemID:       row.ItemID,
-			ItemType:     item.ItemType,
+			ItemType:     auctionEquipmentProtocolItemType(item),
 			Name:         item.Name,
 			Count:        1,
 			UnitPrice:    unit,
