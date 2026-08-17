@@ -121,12 +121,20 @@ func (c Creator) Create(req robotcap.CreateRequest) ([]robotcap.Info, error) {
 	}
 	spawnTargets, hasSpawnTargets := distributedSpawnTargets(env, maps, levels, locations)
 	for i := 0; i < req.Count; i++ {
+		levelJobs := equipcap.FilterEquipmentSupportedJobs(jobs, catalogs.Equipment, levels[i], rc)
+		if len(levelJobs) == 0 {
+			if batchRecovery {
+				rollbackErr := batchEnv.RollbackCreateBatch(batchID)
+				return nil, errors.Join(fmt.Errorf("configured jobs %v have no PVF weapon support at level %d", jobs, levels[i]), rollbackErr)
+			}
+			return nil, fmt.Errorf("configured jobs %v have no PVF weapon support at level %d", jobs, levels[i])
+		}
 		info := robotcap.Info{
 			UID:     allocation.UIDs[i],
 			CID:     allocation.FirstCID + i,
 			Name:    env.RobotName(allocation.UIDs[i], usedNames, rc),
 			Level:   levels[i],
-			Job:     env.RandomFrom(jobs),
+			Job:     env.RandomFrom(levelJobs),
 			Grow:    env.RandomFrom(rc.GrowTypes),
 			Port:    env.RobotGamePort(),
 			Village: rc.SpawnFallbackVillage,

@@ -199,6 +199,37 @@ func TestFilterAvatarSupportedJobsDoesNotCountClientIncompatibleSlots(t *testing
 	}
 }
 
+func TestFilterEquipmentSupportedJobsUsesGeneratedLevel(t *testing.T) {
+	items := []shared.EquipmentCatalogItem{
+		{ID: 100, ItemType: 1, Level: 50, UseJob: []int{1}},
+		{ID: 200, ItemType: 1, Level: 60, UseJob: []int{2}},
+	}
+	rc := robotconfig.RuntimeConfig{EquipSlots: []int{1}, EquipRarityMax: 5}
+	if got := FilterEquipmentSupportedJobs([]int{1, 2, 3}, items, 50, rc); len(got) != 1 || got[0] != 1 {
+		t.Fatalf("level 50 jobs=%v, want [1]", got)
+	}
+	if got := FilterEquipmentSupportedJobs([]int{1, 2, 3}, items, 60, rc); len(got) != 2 || got[0] != 1 || got[1] != 2 {
+		t.Fatalf("level 60 jobs=%v, want [1 2]", got)
+	}
+}
+
+func TestEquipmentSlotsNeedRepairAllowsUnavailableLevelSlots(t *testing.T) {
+	items := map[int]shared.EquipmentCatalogItem{
+		100: {ID: 100, ItemType: 1, Level: 50, Rarity: 3, Durability: 20, UseJob: []int{1}},
+		111: {ID: 111, ItemType: 11, Level: 60, Rarity: 3, UseJob: []int{100}},
+	}
+	rc := robotconfig.RuntimeConfig{EquipSlots: []int{1, 11}, EquipRarityMax: 5}
+	raw := make([]byte, 12*61)
+	binary.LittleEndian.PutUint32(raw[2:6], 100)
+	binary.LittleEndian.PutUint16(raw[11:13], 20)
+	if EquipmentSlotsNeedRepair(raw, items, 50, 1, rc) {
+		t.Fatal("level-locked slot was treated as required")
+	}
+	if !EquipmentSlotsNeedRepair(raw, items, 60, 1, rc) {
+		t.Fatal("available level slot was not treated as required")
+	}
+}
+
 func testSetCandidates(qualitySlots, varietySlots int) map[int][]shared.EquipmentCatalogItem {
 	out := make(map[int][]shared.EquipmentCatalogItem)
 	for slot := 0; slot < qualitySlots; slot++ {

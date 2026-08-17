@@ -128,6 +128,34 @@ func FilterAvatarSupportedJobs(jobs []int, items []shared.EquipmentCatalogItem, 
 	return out
 }
 
+// FilterEquipmentSupportedJobs keeps jobs that can equip a weapon at the
+// character's generated level. Older PVFs may not contain newer job weapons.
+func FilterEquipmentSupportedJobs(jobs []int, items []shared.EquipmentCatalogItem, level int, rc robotconfig.RuntimeConfig) []int {
+	if !configuredEquipmentSlot(rc.EquipSlots, 1) || len(items) == 0 {
+		return append([]int(nil), jobs...)
+	}
+	hasWeaponCatalog := false
+	for _, item := range items {
+		if item.ID > 0 && item.ItemType == 1 {
+			hasWeaponCatalog = true
+			break
+		}
+	}
+	if !hasWeaponCatalog {
+		return append([]int(nil), jobs...)
+	}
+	out := make([]int, 0, len(jobs))
+	for _, job := range jobs {
+		for _, item := range items {
+			if equipmentCandidate(item, 1, level, job, rc) {
+				out = append(out, job)
+				break
+			}
+		}
+	}
+	return out
+}
+
 func SafeAvg(total, count int) int {
 	if count <= 0 {
 		return 0
@@ -249,6 +277,12 @@ func EquipmentSlotsNeedRepair(raw []byte, itemsByID map[int]shared.EquipmentCata
 	if len(slots) == 0 {
 		slots = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
 	}
+	required := make(map[int]bool, len(slots))
+	for _, item := range itemsByID {
+		if equipmentCandidate(item, item.ItemType, level, job, rc) && configuredEquipmentSlot(slots, item.ItemType) {
+			required[item.ItemType] = true
+		}
+	}
 	for _, slot := range slots {
 		if SlotToItemType(slot) == 0 {
 			continue
@@ -259,11 +293,11 @@ func EquipmentSlotsNeedRepair(raw []byte, itemsByID map[int]shared.EquipmentCata
 		}
 		slotRaw := raw[offset : offset+61]
 		itemID := int(binary.LittleEndian.Uint32(slotRaw[2:6]))
-		item, ok := itemsByID[itemID]
-		if !ok || item.ID <= 0 || item.ItemType != slot || item.Expire || !shared.ClientCompatibleEquipment(item) || item.Level > level || !UsableByJob(item.UseJob, job) {
-			return true
+		if itemID == 0 && !required[slot] {
+			continue
 		}
-		if rc.EquipRarityMax > 0 && (item.Rarity < rc.EquipRarityMin || item.Rarity > rc.EquipRarityMax) {
+		item, ok := itemsByID[itemID]
+		if !ok || !equipmentCandidate(item, slot, level, job, rc) {
 			return true
 		}
 		durability := int(binary.LittleEndian.Uint16(slotRaw[11:13]))
@@ -279,6 +313,25 @@ func EquipmentSlotsNeedRepair(raw []byte, itemsByID map[int]shared.EquipmentCata
 		}
 	}
 	return false
+}
+
+func configuredEquipmentSlot(slots []int, wanted int) bool {
+	if len(slots) == 0 {
+		return wanted >= 1 && wanted <= 12
+	}
+	for _, slot := range slots {
+		if slot == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+func equipmentCandidate(item shared.EquipmentCatalogItem, slot, level, job int, rc robotconfig.RuntimeConfig) bool {
+	if item.ID <= 0 || item.ItemType != slot || item.Expire || !shared.ClientCompatibleEquipment(item) || item.Level > level || !UsableByJob(item.UseJob, job) {
+		return false
+	}
+	return rc.EquipRarityMax <= 0 || item.Rarity >= rc.EquipRarityMin && item.Rarity <= rc.EquipRarityMax
 }
 
 type setGroup struct {
