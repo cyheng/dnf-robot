@@ -40,6 +40,8 @@ func (r *RobotVo) parsePacket(inBuf []byte) {
 		}
 	case 6, 9, 11, 22, 23, 28, 29, 153, 173:
 		r.handlePartyPacketUnsafe(packet)
+	case guildInviteNotification:
+		r.handleGuildPacketUnsafe(packet)
 	case 1, 53, 272, 300:
 		r.handleLoginPacketUnsafe(packet)
 	case 13, 15, 16, 17, 88, 90, 238:

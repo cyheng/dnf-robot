@@ -24,6 +24,7 @@ func TestPartyAcceptGameOptions(t *testing.T) {
 	}
 	want := append([]byte(nil), options...)
 	binary.LittleEndian.PutUint16(want[partyRejectOption*2:], 0)
+	binary.LittleEndian.PutUint16(want[guildRejectOption*2:], 0)
 	if !bytes.Equal(got, want) {
 		t.Fatalf("options = %x, want %x", got, want)
 	}
@@ -45,7 +46,7 @@ func TestDefaultPartyAcceptGameOptions(t *testing.T) {
 		if i == 1 {
 			want = 1
 		}
-		if i == partyRejectOption {
+		if i == partyRejectOption || i == guildRejectOption {
 			want = 0
 		}
 		if value := binary.LittleEndian.Uint16(got[i*2:]); value != want {

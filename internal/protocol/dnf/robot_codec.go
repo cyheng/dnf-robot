@@ -45,6 +45,7 @@ const (
 	peerRequestTrade
 	gameEtcOptionSize = 72
 	partyRejectOption = 6
+	guildRejectOption = 30
 )
 
 func buildPeerResponse(request []byte) ([]byte, byte, bool) {
@@ -74,6 +75,7 @@ func partyAcceptGameOptions(packet []byte) ([]byte, bool) {
 	options := make([]byte, gameEtcOptionSize)
 	copy(options, packet[4:4+gameEtcOptionSize])
 	binary.LittleEndian.PutUint16(options[partyRejectOption*2:], 0)
+	binary.LittleEndian.PutUint16(options[guildRejectOption*2:], 0)
 	return options, true
 }
 
@@ -84,7 +86,51 @@ func defaultPartyAcceptGameOptions() []byte {
 	}
 	binary.LittleEndian.PutUint16(options[1*2:], 1)
 	binary.LittleEndian.PutUint16(options[partyRejectOption*2:], 0)
+	binary.LittleEndian.PutUint16(options[guildRejectOption*2:], 0)
 	return options
+}
+
+func parseGuildInvite(data []byte) (guildNameSize, inviterNameSize int, ok bool) {
+	offset := 0
+	readName := func() (int, bool) {
+		if len(data)-offset < 4 {
+			return 0, false
+		}
+		size := int(binary.LittleEndian.Uint32(data[offset : offset+4]))
+		offset += 4
+		if size < 1 || size > 30 || len(data)-offset < size {
+			return 0, false
+		}
+		offset += size
+		return size, true
+	}
+
+	guildNameSize, ok = readName()
+	if !ok {
+		return 0, 0, false
+	}
+	inviterNameSize, ok = readName()
+	if !ok {
+		return 0, 0, false
+	}
+	if len(data)-offset > 15 {
+		return 0, 0, false
+	}
+	return guildNameSize, inviterNameSize, true
+}
+
+func selectGuildInvitePacket(cipher *crypt.DNFCipher, raw []byte, isAnti bool) (guildNameSize, inviterNameSize int, source recvBodySource, err error) {
+	candidates, decryptErr := recvBodyCandidates(cipher, raw, isAnti)
+	for _, candidate := range candidates {
+		guildSize, inviterSize, ok := parseGuildInvite(candidate.body)
+		if ok {
+			return guildSize, inviterSize, candidate.source, nil
+		}
+	}
+	if decryptErr != nil {
+		return 0, 0, recvBodySourceUnknown, decryptErr
+	}
+	return 0, 0, recvBodySourceUnknown, fmt.Errorf("guild invite has no valid body")
 }
 
 func parsePartyIPInfoMembers(packet []byte) ([]partyIPPeer, bool) {

@@ -32,7 +32,7 @@ func (r *RobotVo) sendPartyOptionUnsafe() bool {
 		fmt.Printf("[PARTY_OPTION_SEND_ERROR] uid=%d\n", r.UID)
 		return false
 	}
-	recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "PARTY_OPTION", "OK", "allow_party option sent", pkt)
+	recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "PARTY_OPTION", "OK", "allow_party_and_guild options sent", pkt)
 	r.partyOptionSent = true
 	return true
 }
