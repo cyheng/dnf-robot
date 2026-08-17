@@ -32,7 +32,6 @@ type RestockCfg struct {
 	OtherAllowedRarities     string             `json:"other_allowed_rarities"`
 	EquipmentTradePolicy     string             `json:"equipment_trade_policy"`
 	OtherTradePolicy         string             `json:"other_trade_policy"`
-	EquipmentPriceProtection string             `json:"equipment_price_protection"`
 	BlockedItemIDs           []uint32           `json:"blocked_item_ids"`
 	AllowedItemIDs           []uint32           `json:"allowed_item_ids"`
 	StackSizes               []int              `json:"stack_sizes"`
@@ -42,14 +41,11 @@ type RestockCfg struct {
 	EquipmentLevelMax        int                `json:"equipment_level_max"`
 	EquipInflateMin          int                `json:"equipment_inflate_min"`
 	EquipInflateMax          int                `json:"equipment_inflate_max"`
-	LevelPriceRate           float64            `json:"level_price_rate"`
-	RarityPriceRate          float64            `json:"rarity_price_rate"`
 	UpgradeMin               int                `json:"upgrade_min"`
 	UpgradeMax               int                `json:"upgrade_max"`
 	UpgradePriceRate         float64            `json:"upgrade_price_rate"`
 	RandLow                  float64            `json:"rand_low"`
 	RandHigh                 float64            `json:"rand_high"`
-	ValueModelEnabled        bool               `json:"value_model_enabled"`
 	ValueCategoryWeight      float64            `json:"value_category_weight"`
 	ValueRarityWeight        float64            `json:"value_rarity_weight"`
 	ValueLevelWeight         float64            `json:"value_level_weight"`
@@ -166,7 +162,6 @@ type ConfigUpdateRequest struct {
 	OtherAllowedRarities     *string            `json:"other_allowed_rarities,omitempty"`
 	EquipmentTradePolicy     *string            `json:"equipment_trade_policy,omitempty"`
 	OtherTradePolicy         *string            `json:"other_trade_policy,omitempty"`
-	EquipmentPriceProtection *string            `json:"equipment_price_protection,omitempty"`
 	BlockedItemIDs           []uint32           `json:"blocked_item_ids,omitempty"`
 	BlockedItemIDExpression  *string            `json:"blocked_item_id_expression,omitempty"`
 	AllowedItemIDs           []uint32           `json:"allowed_item_ids,omitempty"`
@@ -186,8 +181,6 @@ type ConfigUpdateRequest struct {
 	EquipmentQtyMax          *int               `json:"equipment_qty_max,omitempty"`
 	EquipInflateMin          *int               `json:"equip_inflate_min,omitempty"`
 	EquipInflateMax          *int               `json:"equip_inflate_max,omitempty"`
-	LevelPriceRate           *float64           `json:"level_price_rate,omitempty"`
-	RarityPriceRate          *float64           `json:"rarity_price_rate,omitempty"`
 	EquipmentLevelMin        *int               `json:"equipment_level_min,omitempty"`
 	EquipmentLevelMax        *int               `json:"equipment_level_max,omitempty"`
 	UpgradeMin               *int               `json:"upgrade_min,omitempty"`
@@ -195,7 +188,6 @@ type ConfigUpdateRequest struct {
 	UpgradePriceRate         *float64           `json:"upgrade_price_rate,omitempty"`
 	RandLow                  *float64           `json:"rand_low,omitempty"`
 	RandHigh                 *float64           `json:"rand_high,omitempty"`
-	ValueModelEnabled        *bool              `json:"value_model_enabled,omitempty"`
 	ValueCategoryWeight      *float64           `json:"value_category_weight,omitempty"`
 	ValueRarityWeight        *float64           `json:"value_rarity_weight,omitempty"`
 	ValueLevelWeight         *float64           `json:"value_level_weight,omitempty"`

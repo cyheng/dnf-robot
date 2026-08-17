@@ -29,15 +29,13 @@ type pvfManifest struct {
 	Runtime           interface{} `json:"runtime,omitempty"`
 }
 
-const pvfExportVersion = 2
+const pvfExportVersion = 3
 
 const pvfSkillStateExportVersion = 2
 
 const pvfItemInfoExportName = "iteminfo.dat"
 
 const pvfEquipmentExportName = "equipment_catalog.json"
-
-const pvfEquipmentPriceCapsExportName = "equipment_level_price_caps.json"
 
 const pvfStackableExportName = "stackable_catalog.json"
 
@@ -115,9 +113,6 @@ func ensureExports(dfGameR, pvfDir, tempDir string) error {
 	}
 	defer os.RemoveAll(stageDir)
 	if err := WriteJSON(filepath.Join(stageDir, pvfEquipmentExportName), equipment); err != nil {
-		return err
-	}
-	if err := WriteJSON(filepath.Join(stageDir, pvfEquipmentPriceCapsExportName), buildEquipmentLevelPriceCaps(equipment)); err != nil {
 		return err
 	}
 	if err := WriteJSON(filepath.Join(stageDir, pvfStackableExportName), stackable); err != nil {
@@ -263,7 +258,7 @@ func pvfExportsCurrent(manifestPath string, want pvfManifest, configDir string) 
 	}
 
 	markerScratch := make([]byte, pvfMarkerScanChunk+pvfMarkerScanOverlap)
-	for _, name := range []string{pvfEquipmentExportName, pvfEquipmentPriceCapsExportName, pvfStackableExportName, pvfMapExportName, pvfSkillStateExportName, pvfLevelExpExportName, pvfItemInfoExportName} {
+	for _, name := range []string{pvfEquipmentExportName, pvfStackableExportName, pvfMapExportName, pvfSkillStateExportName, pvfLevelExpExportName, pvfItemInfoExportName} {
 		path := filepath.Join(configDir, name)
 		stat, err := os.Stat(path)
 		if err != nil || stat.Size() <= 5 {

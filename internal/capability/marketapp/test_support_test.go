@@ -17,7 +17,6 @@ func testApp(t *testing.T) *App {
 	// Most package tests target the legacy formula explicitly. Value-model
 	// tests enable it per case so changing production defaults does not erase
 	// coverage for either pricing path.
-	cfg.Restock.ValueModelEnabled = false
 	cfg.Restock.RandLow = 1
 	cfg.Restock.RandHigh = 1
 	root := t.TempDir()

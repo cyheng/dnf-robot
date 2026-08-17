@@ -10,7 +10,7 @@ func TestCustomPriceRangeOverridesFullEquipmentFormula(t *testing.T) {
 	mustWriteJSON(t, appPaths(app).MarketPrices(), customPriceRangeFile{Version: 1, Items: []customPriceRange{{ItemID: 31056, MinPrice: 700000, MaxPrice: 700000, Enabled: true}}})
 	app.refreshCustomPriceRanges()
 
-	price := app.auctionUnitPriceFor(catalogItem{ItemID: 31056, Kind: "equipment"}, 1000, 8, 13)
+	price := app.auctionUnitPriceFor(catalogItem{ItemID: 31056, Kind: "equipment"}, 8, 13)
 	if price != 700000 {
 		t.Fatalf("custom price=%d want 700000", price)
 	}
@@ -29,6 +29,7 @@ func TestEquipmentFormulaBoundsIncludeMultiplierUpgradeAndRandomRate(t *testing.
 	app.cfg.Restock.UpgradeMin = 7
 	app.cfg.Restock.UpgradeMax = 13
 	app.cfg.Restock.UpgradePriceRate = 0.08
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryEquipment, 1000)
 
 	low, high := app.auctionPriceBounds(catalogItem{ItemID: 31056, Kind: "equipment", Slot: "weapon", Price: 1000})
 	if low != 7020 || high != 24287 {
@@ -63,6 +64,7 @@ func TestEquipmentFormulaBoundsExcludeUpgradeForUnsupportedSlot(t *testing.T) {
 	app.cfg.Restock.UpgradeMin = 13
 	app.cfg.Restock.UpgradeMax = 13
 	app.cfg.Restock.UpgradePriceRate = 0.08
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryEquipment, 1000)
 
 	low, high := app.auctionPriceBounds(catalogItem{Kind: "equipment", Slot: "unknown", Price: 1000})
 	if low != 1000 || high != 1000 {
@@ -70,28 +72,31 @@ func TestEquipmentFormulaBoundsExcludeUpgradeForUnsupportedSlot(t *testing.T) {
 	}
 }
 
-func TestAuctionQualityRatesApplyToEquipmentAndStackableItems(t *testing.T) {
+func TestValueModelAppliesToEquipmentAndStackableItems(t *testing.T) {
 	app := testApp(t)
-	app.cfg.Restock.LevelPriceRate = 0.15
-	app.cfg.Restock.RarityPriceRate = 0.30
+	app.cfg.Restock.ValueCategoryWeight = 0
+	app.cfg.Restock.ValueRarityWeight = 1
+	app.cfg.Restock.ValueLevelWeight = 0
+	app.cfg.Restock.ValuePVFWeight = 0
+	app.cfg.Restock.ValueCurveSpan = 2
+	app.cfg.Restock.ValueBasePrice = 1000
 	app.cfg.Restock.UpgradePriceRate = 0
 	app.cfg.Restock.RandLow = 1
 	app.cfg.Restock.RandHigh = 1
 
-	equipment := catalogItem{Kind: "equipment", Level: 85, Rarity: 4}
-	if got := app.auctionUnitPriceFor(equipment, 1000, 1, 0); got != 7810 {
-		t.Fatalf("equipment price=%d want 7810", got)
+	equipment := catalogItem{Kind: "equipment", Rarity: 4}
+	if got := app.auctionUnitPriceFor(equipment, 1, 0); got != 39810 {
+		t.Fatalf("equipment price=%d want 39810", got)
 	}
-	stackable := catalogItem{Kind: "stackable", Level: 12, Rarity: 2}
-	if got := app.auctionUnitPriceFor(stackable, 1000, 99, 31); got != 2080 {
-		t.Fatalf("stackable price=%d want 2080", got)
+	stackable := catalogItem{Kind: "stackable", Rarity: 2}
+	if got := app.auctionUnitPriceFor(stackable, 99, 31); got != 6309 {
+		t.Fatalf("stackable price=%d want 6309", got)
 	}
 }
 
-func TestAuctionQualityRatesAreIncludedInCollectorBounds(t *testing.T) {
+func TestValueModelIsIncludedInCollectorBounds(t *testing.T) {
 	app := testApp(t)
-	app.cfg.Restock.LevelPriceRate = 0.15
-	app.cfg.Restock.RarityPriceRate = 0.30
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryEquipment, 1000)
 	app.cfg.Restock.EquipInflateMin = 1
 	app.cfg.Restock.EquipInflateMax = 2
 	app.cfg.Restock.UpgradeMin = 0
@@ -100,8 +105,8 @@ func TestAuctionQualityRatesAreIncludedInCollectorBounds(t *testing.T) {
 	app.cfg.Restock.RandHigh = 1
 
 	low, high := app.auctionPriceBounds(catalogItem{Kind: "equipment", Slot: "coat", Level: 5, Rarity: 2, Price: 1000})
-	if low != 1839 || high != 3679 {
-		t.Fatalf("quality bounds=%d..%d want 1839..3679", low, high)
+	if low != 1000 || high != 2000 {
+		t.Fatalf("value-model bounds=%d..%d want 1000..2000", low, high)
 	}
 }
 
@@ -137,8 +142,21 @@ func TestInvalidCustomPriceFileFallsBackToFormula(t *testing.T) {
 	if app.priceRangeStatus.Error == "" {
 		t.Fatal("invalid custom price file did not report an error")
 	}
-	price := app.auctionUnitPriceFor(catalogItem{ItemID: 3037, Kind: "stackable"}, 100, 1, 0)
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryOther, 100)
+	app.cfg.Restock.RandLow = 1
+	app.cfg.Restock.RandHigh = 1
+	price := app.auctionUnitPriceFor(catalogItem{ItemID: 3037, Kind: "stackable"}, 1, 0)
 	if price != 100 {
-		t.Fatalf("formula fallback price=%d want 100", price)
+		t.Fatalf("value-model fallback price=%d want 100", price)
 	}
+}
+
+func setFixedValueModelBase(cfg *RestockCfg, category string, base int32) {
+	cfg.ValueCategoryWeight = 1
+	cfg.ValueRarityWeight = 0
+	cfg.ValueLevelWeight = 0
+	cfg.ValuePVFWeight = 0
+	cfg.ValueCurveSpan = 6
+	cfg.ValueBasePrice = base
+	cfg.ValueCategoryRecognition[category] = 0
 }

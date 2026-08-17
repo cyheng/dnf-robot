@@ -183,6 +183,8 @@ func TestPlanAuctionAddsCollectForExistingHighRaritySystemStock(t *testing.T) {
 
 func TestPlanAuctionStackableSplitsQuantity(t *testing.T) {
 	app := testApp(t)
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryOther, 88)
+	app.cfg.Restock.RandLow, app.cfg.Restock.RandHigh = 1, 1
 	result := &PlanResult{}
 	catalog := map[uint32]catalogItem{
 		3037: {ItemID: 3037, Name: "cube", Kind: "stackable", Attach: "free", StackLimit: 1000},
@@ -216,6 +218,8 @@ func TestPlanAuctionStackableSplitsQuantity(t *testing.T) {
 
 func TestPlanAuctionStackableClampsToPVFStackLimit(t *testing.T) {
 	app := testApp(t)
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryOther, 200000)
+	app.cfg.Restock.RandLow, app.cfg.Restock.RandHigh = 1, 1
 	result := &PlanResult{}
 	catalog := map[uint32]catalogItem{
 		36: {ItemID: 36, Name: "speaker", Kind: "stackable", Attach: "free", StackLimit: 1},
@@ -236,6 +240,8 @@ func TestPlanAuctionStackableClampsToPVFStackLimit(t *testing.T) {
 
 func TestPlanAuctionStackableAvoidsInt32TotalOverflow(t *testing.T) {
 	app := testApp(t)
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryOther, 10276010)
+	app.cfg.Restock.RandLow, app.cfg.Restock.RandHigh = 1, 1
 	result := &PlanResult{}
 	catalog := map[uint32]catalogItem{
 		63041: {ItemID: 63041, Name: "fallback stack", Kind: "stackable", Attach: "free"},
@@ -284,7 +290,7 @@ func TestPlanAuctionEquipmentUsesSingleRecordPrice(t *testing.T) {
 		t.Fatalf("actions = %d, want 2", len(result.Actions))
 	}
 	for _, action := range result.Actions {
-		if action.Count != 1 || action.InstantPrice <= 88888 || action.CountAddInfo != 1 {
+		if action.Count != 1 || action.InstantPrice <= 0 || action.InstantPrice != action.UnitPrice || action.CountAddInfo != 1 {
 			t.Fatalf("unexpected equipment action: %#v", action)
 		}
 		if action.Upgrade == nil || *action.Upgrade < 7 || *action.Upgrade > 13 {
@@ -535,10 +541,11 @@ func TestAuctionTargetRecordsUsesFinalStackLimit(t *testing.T) {
 	}
 }
 
-func TestAuctionUnitPriceUsesUpgradeOnly(t *testing.T) {
+func TestAuctionUnitPriceAppliesUpgradeAdjustment(t *testing.T) {
 	app := testApp(t)
-	low := app.auctionUnitPrice(1000, true, 5, 7)
-	highUpgrade := app.auctionUnitPrice(1000, true, 5, 13)
+	item := catalogItem{Kind: "equipment", Slot: "weapon"}
+	low := app.auctionUnitPriceFor(item, 5, 7)
+	highUpgrade := app.auctionUnitPriceFor(item, 5, 13)
 
 	if highUpgrade <= low {
 		t.Fatalf("high upgrade price = %d, want > %d", highUpgrade, low)

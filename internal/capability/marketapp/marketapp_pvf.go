@@ -548,7 +548,6 @@ func (a *App) loadCatalog() (map[uint32]catalogItem, error) {
 		}
 		out[uint32(item.ID)] = catalogItem{ItemID: uint32(item.ID), Kind: kind, Path: item.Path, Level: item.Level, ItemType: item.ItemType, SubType: item.SubType, Slot: item.Slot, Attach: item.Attach, Rarity: item.Rarity, StackLimit: item.StackLimit, Price: int32(item.Price), Value: int32(item.Value), Trade: item.Trade, NoTrade: item.NoTrade, TradeBlock: item.TradeBlock, CanTrade: item.CanTrade, CanAuction: item.CanAuction, Auction: item.Auction, NeedMaterial: item.NeedMaterial, BasicMaterial: item.BasicMaterial, ClientIncompatible: item.ClientIncompatible}
 	}
-	_ = a.refreshEquipmentPriceCaps()
 	return out, nil
 }
 

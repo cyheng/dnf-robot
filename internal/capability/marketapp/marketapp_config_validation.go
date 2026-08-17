@@ -86,9 +86,6 @@ func validateMarketConfig(cfg Config) error {
 	if r.OtherTradePolicy != tradePolicyPermissive && r.OtherTradePolicy != tradePolicyStrict {
 		return fmt.Errorf("auction_price.other_trade_policy must be permissive or strict")
 	}
-	if !validEquipmentPriceProtection(r.EquipmentPriceProtection) {
-		return fmt.Errorf("auction_price.equipment_price_protection must be off, strict, standard, or relaxed")
-	}
 	if err := validateConfiguredItemIDs("blocked_item_ids", r.BlockedItemIDs); err != nil {
 		return err
 	}
@@ -117,12 +114,6 @@ func validateMarketConfig(cfg Config) error {
 	if r.EquipInflateMin <= 0 || r.EquipInflateMin > marketConfigMaxInflate || r.EquipInflateMax < r.EquipInflateMin || r.EquipInflateMax > marketConfigMaxInflate {
 		return fmt.Errorf("auction_price equipment multipliers must satisfy 1 <= min <= max <= %d", marketConfigMaxInflate)
 	}
-	if !finiteInRange(r.LevelPriceRate, 0, marketConfigMaxRate) {
-		return fmt.Errorf("auction_price.level_price_rate must be finite and in 0..%d", marketConfigMaxRate)
-	}
-	if !finiteInRange(r.RarityPriceRate, 0, marketConfigMaxRate) {
-		return fmt.Errorf("auction_price.rarity_price_rate must be finite and in 0..%d", marketConfigMaxRate)
-	}
 	if r.UpgradeMin < 0 || r.UpgradeMin > marketConfigMaxUpgrade || r.UpgradeMax < r.UpgradeMin || r.UpgradeMax > marketConfigMaxUpgrade {
 		return fmt.Errorf("auction_price upgrades must satisfy 0 <= min <= max <= %d", marketConfigMaxUpgrade)
 	}
@@ -147,7 +138,7 @@ func validateMarketConfig(cfg Config) error {
 		return fmt.Errorf("auction_price.value_base_price must be positive")
 	}
 	for key, value := range r.ValueCategoryRecognition {
-		if strings.TrimSpace(key) == "" || !finiteInRange(value, 0, 100) {
+		if !validValueCategory(key) || !finiteInRange(value, 0, 100) {
 			return fmt.Errorf("auction_price.value_category_recognition contains invalid %q", key)
 		}
 	}

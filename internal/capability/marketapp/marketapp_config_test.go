@@ -34,7 +34,7 @@ func TestLoadConfigCreatesCommentedINIInConfDirectory(t *testing.T) {
 	if !strings.Contains(text, "[auction_price]") || !strings.Contains(text, "# 装备基础价格的最小随机倍率。") {
 		t.Fatalf("generated INI lacks documented pricing configuration:\n%s", text)
 	}
-	if !strings.Contains(text, "equipment_allowed_rarities = 012345") || !strings.Contains(text, "other_allowed_rarities = 012345") || !strings.Contains(text, "equipment_trade_policy = permissive") || !strings.Contains(text, "other_trade_policy = permissive") || !strings.Contains(text, "equipment_price_protection = standard") {
+	if !strings.Contains(text, "equipment_allowed_rarities = 012345") || !strings.Contains(text, "other_allowed_rarities = 012345") || !strings.Contains(text, "equipment_trade_policy = permissive") || !strings.Contains(text, "other_trade_policy = permissive") {
 		t.Fatalf("generated INI does not use the default listed rarity digits:\n%s", text)
 	}
 	if !strings.Contains(text, "blocked_item_ids = ") {
@@ -43,7 +43,7 @@ func TestLoadConfigCreatesCommentedINIInConfDirectory(t *testing.T) {
 	if !strings.Contains(text, "allowed_item_ids = ") {
 		t.Fatalf("generated INI lacks allowed item IDs setting:\n%s", text)
 	}
-	for _, recommended := range []string{"equip_inflate_min = 1", "equip_inflate_max = 2", "level_price_rate = 0.15", "rarity_price_rate = 0.3"} {
+	for _, recommended := range []string{"equip_inflate_min = 1", "equip_inflate_max = 2", "value_category_weight = 0.45", "value_rarity_weight = 0.25", "value_level_weight = 0.2", "value_pvf_weight = 0.1", "value_curve_span = 6", "value_base_price = 1000"} {
 		if !strings.Contains(text, recommended) {
 			t.Fatalf("generated INI lacks recommended pricing setting %q:\n%s", recommended, text)
 		}
@@ -109,10 +109,12 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Restock.BlockedItemIDs = []uint32{100, 300}
 	cfg.Restock.AllowedItemIDs = []uint32{200, 400}
-	cfg.Restock.EquipmentPriceProtection = equipmentPriceProtectionStrict
-	cfg.Restock.ValueModelEnabled = true
 	cfg.Restock.ValueCurveSpan = 4.5
 	cfg.Restock.ValueBasePrice = 2500
+	cfg.Restock.ValueCategoryWeight = .4
+	cfg.Restock.ValueRarityWeight = .3
+	cfg.Restock.ValueLevelWeight = .2
+	cfg.Restock.ValuePVFWeight = .1
 	cfg.Restock.ValueCategoryRecognition[valueCategoryBead] = 73
 	if err := writeMarketConfig(path, cfg); err != nil {
 		t.Fatal(err)
@@ -127,10 +129,7 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	if got := loaded.Restock.AllowedItemIDs; len(got) != 2 || got[0] != 200 || got[1] != 400 {
 		t.Fatalf("allowed item IDs = %v, want [200 400]", got)
 	}
-	if loaded.Restock.EquipmentPriceProtection != equipmentPriceProtectionStrict {
-		t.Fatalf("equipment price protection = %q, want strict", loaded.Restock.EquipmentPriceProtection)
-	}
-	if !loaded.Restock.ValueModelEnabled || loaded.Restock.ValueCurveSpan != 4.5 || loaded.Restock.ValueBasePrice != 2500 {
+	if loaded.Restock.ValueCurveSpan != 4.5 || loaded.Restock.ValueBasePrice != 2500 || loaded.Restock.ValueCategoryWeight != .4 || loaded.Restock.ValueRarityWeight != .3 || loaded.Restock.ValueLevelWeight != .2 || loaded.Restock.ValuePVFWeight != .1 {
 		t.Fatalf("value model settings did not round trip: %+v", loaded.Restock)
 	}
 	if got := loaded.Restock.ValueCategoryRecognition[valueCategoryBead]; got != 73 {
@@ -138,11 +137,11 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	}
 }
 
-func TestMarketConfigRejectsInvalidEquipmentPriceProtection(t *testing.T) {
+func TestMarketConfigRejectsUnknownValueCategory(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Restock.EquipmentPriceProtection = "maximum"
-	if err := validateMarketConfig(cfg); err == nil || !strings.Contains(err.Error(), "equipment_price_protection") {
-		t.Fatalf("invalid equipment price protection error = %v", err)
+	cfg.Restock.ValueCategoryRecognition["unknown"] = 50
+	if err := validateMarketConfig(cfg); err == nil || !strings.Contains(err.Error(), "value_category_recognition") {
+		t.Fatalf("unknown value category error = %v", err)
 	}
 }
 
@@ -199,8 +198,12 @@ equipment_level_min = 40
 equipment_level_max = 70
 equip_inflate_min = 4
 equip_inflate_max = 7
-level_price_rate = 0.2
-rarity_price_rate = 0.4
+value_category_weight = 0.4
+value_rarity_weight = 0.3
+value_level_weight = 0.2
+value_pvf_weight = 0.1
+value_curve_span = 5
+value_base_price = 2500
 upgrade_min = 6
 upgrade_max = 11
 upgrade_price_rate = 0.12
@@ -224,7 +227,7 @@ out_of_range_probability = 0.02
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Restock.EquipmentLevelMin != 40 || cfg.Restock.EquipmentLevelMax != 70 || cfg.Restock.EquipInflateMin != 4 || cfg.Restock.LevelPriceRate != 0.2 || cfg.Restock.RarityPriceRate != 0.4 || cfg.Restock.UpgradePriceRate != 0.12 || !cfg.Restock.CustomPriceEnabled {
+	if cfg.Restock.EquipmentLevelMin != 40 || cfg.Restock.EquipmentLevelMax != 70 || cfg.Restock.EquipInflateMin != 4 || cfg.Restock.ValueCategoryWeight != 0.4 || cfg.Restock.ValueRarityWeight != 0.3 || cfg.Restock.ValueLevelWeight != 0.2 || cfg.Restock.ValuePVFWeight != 0.1 || cfg.Restock.ValueCurveSpan != 5 || cfg.Restock.ValueBasePrice != 2500 || cfg.Restock.UpgradePriceRate != 0.12 || !cfg.Restock.CustomPriceEnabled {
 		t.Fatalf("pricing config=%+v", cfg.Restock)
 	}
 	if cfg.Collector.Enabled || !cfg.Collector.PriceRangeEnabled || cfg.Collector.InRangeProbability != 0.9 || cfg.Collector.OutRangeProbability != 0.02 {

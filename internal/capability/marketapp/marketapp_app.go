@@ -17,7 +17,6 @@ import (
 	"robot/internal/foundation/layout"
 	"robot/internal/foundation/lockhub"
 	"robot/internal/foundation/logfile"
-	"robot/internal/shared"
 )
 
 type App struct {
@@ -80,7 +79,6 @@ type App struct {
 	logClosed           bool
 	priceRanges         map[uint32]customPriceRange
 	priceRangeStatus    PriceRangeStatus
-	equipmentPriceCaps  map[int]shared.EquipmentLevelPriceCap
 	runtimeFilesWatched atomic.Bool
 	rebuildRunning      atomic.Bool
 	marketKindsActual   int
@@ -395,9 +393,6 @@ func (a *App) UpdateConfig(req ConfigUpdateRequest) (Status, error) {
 	if req.OtherTradePolicy != nil {
 		cfg.Restock.OtherTradePolicy = strings.TrimSpace(*req.OtherTradePolicy)
 	}
-	if req.EquipmentPriceProtection != nil {
-		cfg.Restock.EquipmentPriceProtection = strings.ToLower(strings.TrimSpace(*req.EquipmentPriceProtection))
-	}
 	if req.BlockedItemIDExpression != nil {
 		blocked, err := decodeBlockedItemIDs(*req.BlockedItemIDExpression)
 		if err != nil {
@@ -463,12 +458,6 @@ func (a *App) UpdateConfig(req ConfigUpdateRequest) (Status, error) {
 	if req.EquipInflateMax != nil {
 		cfg.Restock.EquipInflateMax = *req.EquipInflateMax
 	}
-	if req.LevelPriceRate != nil {
-		cfg.Restock.LevelPriceRate = *req.LevelPriceRate
-	}
-	if req.RarityPriceRate != nil {
-		cfg.Restock.RarityPriceRate = *req.RarityPriceRate
-	}
 	if req.EquipmentLevelMin != nil {
 		cfg.Restock.EquipmentLevelMin = *req.EquipmentLevelMin
 	}
@@ -490,9 +479,6 @@ func (a *App) UpdateConfig(req ConfigUpdateRequest) (Status, error) {
 	if req.RandHigh != nil {
 		cfg.Restock.RandHigh = *req.RandHigh
 	}
-	if req.ValueModelEnabled != nil {
-		cfg.Restock.ValueModelEnabled = *req.ValueModelEnabled
-	}
 	if req.ValueCategoryWeight != nil {
 		cfg.Restock.ValueCategoryWeight = *req.ValueCategoryWeight
 	}
@@ -512,10 +498,7 @@ func (a *App) UpdateConfig(req ConfigUpdateRequest) (Status, error) {
 		cfg.Restock.ValueBasePrice = *req.ValueBasePrice
 	}
 	if req.ValueCategoryRecognition != nil {
-		cfg.Restock.ValueCategoryRecognition = make(map[string]float64, len(req.ValueCategoryRecognition))
-		for key, value := range req.ValueCategoryRecognition {
-			cfg.Restock.ValueCategoryRecognition[strings.ToLower(strings.TrimSpace(key))] = value
-		}
+		cfg.Restock.ValueCategoryRecognition = mergeValueCategoryRecognition(cfg.Restock.ValueCategoryRecognition, req.ValueCategoryRecognition)
 	}
 	if req.CustomPriceEnabled != nil {
 		cfg.Restock.CustomPriceEnabled = *req.CustomPriceEnabled

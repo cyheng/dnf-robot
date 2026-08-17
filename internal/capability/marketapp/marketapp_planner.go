@@ -75,10 +75,12 @@ func (a *App) equipmentLevelSkipReason(item catalogItem) string {
 }
 
 func auctionPlanRow(row restockRow, catalog map[uint32]catalogItem) (restockRow, catalogItem) {
-	if row.Kind == "" {
-		if catalogItem, ok := catalog[row.ItemID]; ok {
-			row.applyMarketItem(catalogItem)
+	if catalogItem, ok := catalog[row.ItemID]; ok {
+		row.applyMarketItem(catalogItem)
+		if catalogItem.Name == "" {
+			catalogItem.Name = row.Name
 		}
+		return row, catalogItem
 	}
 	item := row.marketItem()
 	if item.Name == "" {
@@ -164,7 +166,7 @@ func (a *App) appendNormalAuctionActions(plan normalAuctionPlan, occ map[uint32]
 				actionUpgrade = &upgrade
 			}
 		}
-		unit := a.auctionUnitPriceFor(plan.Item, plan.Row.SystemPrice, plan.BatchInflate, upgrade)
+		unit := a.auctionUnitPriceFor(plan.Item, plan.BatchInflate, upgrade)
 		total := unit
 		startPrice := unit - 1
 		if !plan.IsEquipment {
@@ -301,7 +303,7 @@ func (a *App) planSpecialAuction(row restockRow, item catalogItem, special strin
 	batchInflate := float64(a.randomRange(cfg.Restock.EquipInflateMin, cfg.Restock.EquipInflateMax))
 	planned := 0
 	for i := 0; i < records; i++ {
-		unit := a.auctionUnitPriceFor(item, row.SystemPrice, batchInflate, 0)
+		unit := a.auctionUnitPriceFor(item, batchInflate, 0)
 		ownerID := a.pickOwner(occ)
 		action := Action{
 			Market:       marketNameAuction,

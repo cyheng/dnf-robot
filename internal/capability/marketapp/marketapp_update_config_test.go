@@ -26,7 +26,7 @@ func TestUpdateConfigKeepsIndependentActionLimits(t *testing.T) {
 	autoActions, restockActions, collectActions := 111, 222, 333
 	autoConcurrent, restockConcurrent, collectConcurrent := 7, 8, 9
 	qtyMin, qtyMax, delay := 3, 7, 25
-	levelRate, rarityRate := 0.2, 0.4
+	categoryWeight, levelWeight := 0.4, 0.2
 	if _, err := app.UpdateConfig(ConfigUpdateRequest{
 		AutoMaxActions:         &autoActions,
 		RestockMaxActions:      &restockActions,
@@ -36,8 +36,8 @@ func TestUpdateConfigKeepsIndependentActionLimits(t *testing.T) {
 		CollectorMaxConcurrent: &collectConcurrent,
 		EquipmentQtyMin:        &qtyMin,
 		EquipmentQtyMax:        &qtyMax,
-		LevelPriceRate:         &levelRate,
-		RarityPriceRate:        &rarityRate,
+		ValueCategoryWeight:    &categoryWeight,
+		ValueLevelWeight:       &levelWeight,
 		StackSizes:             []int{100, 500},
 		BlockedItemIDs:         []uint32{300, 100, 300, 0},
 		AllowedItemIDs:         []uint32{400, 200, 400, 0},
@@ -54,8 +54,8 @@ func TestUpdateConfigKeepsIndependentActionLimits(t *testing.T) {
 	if app.cfg.Restock.EquipmentQtyMin != 3 || app.cfg.Restock.EquipmentQtyMax != 7 || app.cfg.Restock.PerItemDelayMS != 25 || len(app.cfg.Restock.StackSizes) != 2 {
 		t.Fatalf("restock web settings not applied: %+v", app.cfg.Restock)
 	}
-	if app.cfg.Restock.LevelPriceRate != 0.2 || app.cfg.Restock.RarityPriceRate != 0.4 {
-		t.Fatalf("quality price rates not applied: %+v", app.cfg.Restock)
+	if app.cfg.Restock.ValueCategoryWeight != 0.4 || app.cfg.Restock.ValueLevelWeight != 0.2 {
+		t.Fatalf("value weights not applied: %+v", app.cfg.Restock)
 	}
 	if got := app.cfg.Restock.BlockedItemIDs; len(got) != 2 || got[0] != 100 || got[1] != 300 {
 		t.Fatalf("blocked item IDs = %v, want [100 300]", got)
@@ -71,14 +71,15 @@ func TestApplyListingConfigLockedDoesNotChangeRuntimeParameters(t *testing.T) {
 	app.cfg.Auto.IntervalMS = 98765
 	app.cfg.Restock.MaxConcurrent = 17
 	allowed, equipmentPolicy, materialPolicy := "056", tradePolicyStrict, tradePolicyPermissive
-	priceProtection := equipmentPriceProtectionRelaxed
 	qty := 4
-	levelRate, rarityRate := 0.25, 0.5
+	curveSpan, categoryWeight := 5.5, 0.5
+	basePrice := int32(2500)
+	recognition := map[string]float64{valueCategoryEquipment: 55, valueCategoryCard: 0}
 	cfg, err := app.applyListingConfigLocked(ConfigUpdateRequest{
 		EquipmentAllowedRarities: &allowed, EquipmentTradePolicy: &equipmentPolicy, OtherTradePolicy: &materialPolicy,
-		EquipmentPriceProtection: &priceProtection,
-		EquipmentQtyMin:          &qty, EquipmentQtyMax: &qty, BlockedItemIDs: []uint32{20, 10, 20},
-		LevelPriceRate: &levelRate, RarityPriceRate: &rarityRate,
+		EquipmentQtyMin: &qty, EquipmentQtyMax: &qty, BlockedItemIDs: []uint32{20, 10, 20},
+		ValueCurveSpan: &curveSpan, ValueBasePrice: &basePrice, ValueCategoryWeight: &categoryWeight,
+		ValueCategoryRecognition: recognition,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -86,11 +87,8 @@ func TestApplyListingConfigLockedDoesNotChangeRuntimeParameters(t *testing.T) {
 	if cfg.Restock.EquipmentAllowedRarities != "056" || cfg.Restock.EquipmentTradePolicy != tradePolicyStrict || cfg.Restock.OtherTradePolicy != tradePolicyPermissive {
 		t.Fatalf("listing settings not applied: %+v", cfg.Restock)
 	}
-	if cfg.Restock.EquipmentPriceProtection != equipmentPriceProtectionRelaxed {
-		t.Fatalf("equipment price protection not applied: %+v", cfg.Restock)
-	}
-	if cfg.Restock.LevelPriceRate != 0.25 || cfg.Restock.RarityPriceRate != 0.5 {
-		t.Fatalf("listing price rates not applied: %+v", cfg.Restock)
+	if cfg.Restock.ValueCurveSpan != 5.5 || cfg.Restock.ValueBasePrice != 2500 || cfg.Restock.ValueCategoryWeight != 0.5 || cfg.Restock.ValueCategoryRecognition[valueCategoryEquipment] != 55 || cfg.Restock.ValueCategoryRecognition[valueCategoryCard] != 0 {
+		t.Fatalf("listing value model not applied: %+v", cfg.Restock)
 	}
 	if got := cfg.Restock.BlockedItemIDs; len(got) != 2 || got[0] != 10 || got[1] != 20 {
 		t.Fatalf("listing blocked item IDs = %v, want [10 20]", got)

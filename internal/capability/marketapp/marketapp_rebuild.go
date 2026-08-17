@@ -137,9 +137,6 @@ func (a *App) applyListingConfigLocked(req ConfigUpdateRequest) (Config, error) 
 	if req.OtherTradePolicy != nil {
 		cfg.Restock.OtherTradePolicy = strings.TrimSpace(*req.OtherTradePolicy)
 	}
-	if req.EquipmentPriceProtection != nil {
-		cfg.Restock.EquipmentPriceProtection = strings.ToLower(strings.TrimSpace(*req.EquipmentPriceProtection))
-	}
 	if req.BlockedItemIDExpression != nil {
 		blocked, err := decodeBlockedItemIDs(*req.BlockedItemIDExpression)
 		if err != nil {
@@ -179,12 +176,6 @@ func (a *App) applyListingConfigLocked(req ConfigUpdateRequest) (Config, error) 
 	if req.EquipInflateMax != nil {
 		cfg.Restock.EquipInflateMax = *req.EquipInflateMax
 	}
-	if req.LevelPriceRate != nil {
-		cfg.Restock.LevelPriceRate = *req.LevelPriceRate
-	}
-	if req.RarityPriceRate != nil {
-		cfg.Restock.RarityPriceRate = *req.RarityPriceRate
-	}
 	if req.UpgradeMin != nil {
 		cfg.Restock.UpgradeMin = *req.UpgradeMin
 	}
@@ -199,6 +190,27 @@ func (a *App) applyListingConfigLocked(req ConfigUpdateRequest) (Config, error) 
 	}
 	if req.RandHigh != nil {
 		cfg.Restock.RandHigh = *req.RandHigh
+	}
+	if req.ValueCategoryWeight != nil {
+		cfg.Restock.ValueCategoryWeight = *req.ValueCategoryWeight
+	}
+	if req.ValueRarityWeight != nil {
+		cfg.Restock.ValueRarityWeight = *req.ValueRarityWeight
+	}
+	if req.ValueLevelWeight != nil {
+		cfg.Restock.ValueLevelWeight = *req.ValueLevelWeight
+	}
+	if req.ValuePVFWeight != nil {
+		cfg.Restock.ValuePVFWeight = *req.ValuePVFWeight
+	}
+	if req.ValueCurveSpan != nil {
+		cfg.Restock.ValueCurveSpan = *req.ValueCurveSpan
+	}
+	if req.ValueBasePrice != nil {
+		cfg.Restock.ValueBasePrice = *req.ValueBasePrice
+	}
+	if req.ValueCategoryRecognition != nil {
+		cfg.Restock.ValueCategoryRecognition = mergeValueCategoryRecognition(cfg.Restock.ValueCategoryRecognition, req.ValueCategoryRecognition)
 	}
 	if req.CollectorEnabled != nil {
 		cfg.Collector.Enabled = *req.CollectorEnabled

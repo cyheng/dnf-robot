@@ -32,10 +32,9 @@ func DefaultConfig() Config {
 		Collector:       CollectorCfg{Enabled: true, MaxConcurrent: 8, InRangeProbability: 0.8, OutRangeProbability: 0.05},
 		Restock: RestockCfg{
 			Comments: defaultRestockComments(), EquipmentAllowedRarities: defaultEquipmentRarities, OtherAllowedRarities: defaultOtherRarities,
-			EquipmentTradePolicy: tradePolicyPermissive, OtherTradePolicy: tradePolicyPermissive, EquipmentPriceProtection: equipmentPriceProtectionStandard, StackSizes: []int{500, 1000, 2000},
+			EquipmentTradePolicy: tradePolicyPermissive, OtherTradePolicy: tradePolicyPermissive, StackSizes: []int{500, 1000, 2000},
 			EquipmentQtyMin: 2, EquipmentQtyMax: 5, EquipInflateMin: 1, EquipInflateMax: 2,
-			LevelPriceRate: 0.15, RarityPriceRate: 0.30,
-			ValueModelEnabled: true, ValueCategoryWeight: 0.45, ValueRarityWeight: 0.25, ValueLevelWeight: 0.20, ValuePVFWeight: 0.10,
+			ValueCategoryWeight: 0.45, ValueRarityWeight: 0.25, ValueLevelWeight: 0.20, ValuePVFWeight: 0.10,
 			ValueCurveSpan: 6, ValueBasePrice: 1000, ValueCategoryRecognition: defaultValueCategoryRecognition(),
 			UpgradeMin: 7, UpgradeMax: 13, UpgradePriceRate: 0.08, RandLow: 0.9, RandHigh: 1.1,
 			MaxActions: defaultMarketMaxActions, MaxConcurrent: 8, MaxResultActions: 200,
@@ -98,7 +97,6 @@ func decodeMarketINI(ini *foundationconfig.INIConfig) (Config, error) {
 	}
 	c.Restock.EquipmentTradePolicy = ini.GetString("auction_price", "equipment_trade_policy", d.Restock.EquipmentTradePolicy)
 	c.Restock.OtherTradePolicy = ini.GetString("auction_price", "other_trade_policy", d.Restock.OtherTradePolicy)
-	c.Restock.EquipmentPriceProtection = strings.ToLower(strings.TrimSpace(ini.GetString("auction_price", "equipment_price_protection", d.Restock.EquipmentPriceProtection)))
 	c.Restock.BlockedItemIDs, err = decodeBlockedItemIDs(ini.GetString("auction_price", "blocked_item_ids", ""))
 	if err != nil {
 		return Config{}, err
@@ -114,14 +112,11 @@ func decodeMarketINI(ini *foundationconfig.INIConfig) (Config, error) {
 	c.Restock.EquipmentLevelMax = ini.GetInt("auction_price", "equipment_level_max", d.Restock.EquipmentLevelMax)
 	c.Restock.EquipInflateMin = ini.GetInt("auction_price", "equip_inflate_min", d.Restock.EquipInflateMin)
 	c.Restock.EquipInflateMax = ini.GetInt("auction_price", "equip_inflate_max", d.Restock.EquipInflateMax)
-	c.Restock.LevelPriceRate = iniFloat(ini, "auction_price", "level_price_rate", d.Restock.LevelPriceRate)
-	c.Restock.RarityPriceRate = iniFloat(ini, "auction_price", "rarity_price_rate", d.Restock.RarityPriceRate)
 	c.Restock.UpgradeMin = ini.GetInt("auction_price", "upgrade_min", d.Restock.UpgradeMin)
 	c.Restock.UpgradeMax = ini.GetInt("auction_price", "upgrade_max", d.Restock.UpgradeMax)
 	c.Restock.UpgradePriceRate = iniFloat(ini, "auction_price", "upgrade_price_rate", d.Restock.UpgradePriceRate)
 	c.Restock.RandLow = iniFloat(ini, "auction_price", "rand_low", d.Restock.RandLow)
 	c.Restock.RandHigh = iniFloat(ini, "auction_price", "rand_high", d.Restock.RandHigh)
-	c.Restock.ValueModelEnabled = iniBool(ini, "auction_price", "value_model_enabled", d.Restock.ValueModelEnabled)
 	c.Restock.ValueCategoryWeight = iniFloat(ini, "auction_price", "value_category_weight", d.Restock.ValueCategoryWeight)
 	c.Restock.ValueRarityWeight = iniFloat(ini, "auction_price", "value_rarity_weight", d.Restock.ValueRarityWeight)
 	c.Restock.ValueLevelWeight = iniFloat(ini, "auction_price", "value_level_weight", d.Restock.ValueLevelWeight)
@@ -175,7 +170,6 @@ func writeMarketConfig(path string, c Config) error {
 		"# 允许自动补货上架的其他物品稀有度数字，只允许 0 到 9。", "other_allowed_rarities = " + c.Restock.OtherAllowedRarities,
 		"# 装备交易策略：permissive 或 strict。", "equipment_trade_policy = " + c.Restock.EquipmentTradePolicy,
 		"# 其他物品交易策略：permissive 或 strict。", "other_trade_policy = " + c.Restock.OtherTradePolicy,
-		"# 装备异常价格保护：off、strict、standard 或 relaxed；按当前 PVF 自动统计同等级装备基础价格上限。", "equipment_price_protection = " + c.Restock.EquipmentPriceProtection,
 		"# 禁止自动或指定补货上架的物品 ID；支持逗号、空格、换行和 8-50 范围写法。", "blocked_item_ids = " + encodeBlockedItemIDs(c.Restock.BlockedItemIDs),
 		"# 始终允许上架的物品 ID；支持逗号、空格、换行和 8-50 范围写法，并优先于黑名单、稀有度、等级和交易策略过滤。", "allowed_item_ids = " + encodeAllowedItemIDs(c.Restock.AllowedItemIDs),
 		"# 堆叠物品的候选数量，使用逗号分隔；实际数量不会超过 PVF stack_limit。", "stack_sizes = " + joinInts(c.Restock.StackSizes),
@@ -185,14 +179,11 @@ func writeMarketConfig(path string, c Config) error {
 		"# 允许上架的最高装备等级；0 表示不限制最高等级。", fmt.Sprintf("equipment_level_max = %d", c.Restock.EquipmentLevelMax),
 		"# 装备基础价格的最小随机倍率。", fmt.Sprintf("equip_inflate_min = %d", c.Restock.EquipInflateMin),
 		"# 装备基础价格的最大随机倍率。", fmt.Sprintf("equip_inflate_max = %d", c.Restock.EquipInflateMax),
-		"# 物品每提高 5 级相对基础价格增加的比例；0.15 表示增加 15%。", "level_price_rate = " + formatFloat(c.Restock.LevelPriceRate),
-		"# 物品每提高 1 级稀有度相对基础价格增加的比例；0.3 表示增加 30%。", "rarity_price_rate = " + formatFloat(c.Restock.RarityPriceRate),
 		"# 装备随机强化的最低等级。", fmt.Sprintf("upgrade_min = %d", c.Restock.UpgradeMin),
 		"# 装备随机强化的最高等级。", fmt.Sprintf("upgrade_max = %d", c.Restock.UpgradeMax),
 		"# 每级强化的价格加成比例；+10 以上还会使用同一比例叠加二次增长的损坏风险溢价。", "upgrade_price_rate = " + formatFloat(c.Restock.UpgradePriceRate),
 		"# 最终价格的最小随机倍率。", "rand_low = " + formatFloat(c.Restock.RandLow),
 		"# 最终价格的最大随机倍率。", "rand_high = " + formatFloat(c.Restock.RandHigh),
-		"# 是否启用基于类别认可度、稀有度、等级和 PVF 参考价的价值评分模型。", "value_model_enabled = " + strconv.FormatBool(c.Restock.ValueModelEnabled),
 		"# 价值模型中类别认可度的权重。", "value_category_weight = " + formatFloat(c.Restock.ValueCategoryWeight),
 		"# 价值模型中稀有度的权重。", "value_rarity_weight = " + formatFloat(c.Restock.ValueRarityWeight),
 		"# 价值模型中等级的权重。", "value_level_weight = " + formatFloat(c.Restock.ValueLevelWeight),

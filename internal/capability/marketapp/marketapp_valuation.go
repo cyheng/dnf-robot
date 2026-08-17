@@ -30,6 +30,28 @@ func defaultValueCategoryRecognition() map[string]float64 {
 	}
 }
 
+func validValueCategory(value string) bool {
+	switch value {
+	case valueCategoryEquipment, valueCategoryTitle, valueCategoryCard, valueCategoryCreature,
+		valueCategoryArtifact, valueCategoryBead, valueCategoryRecipe, valueCategoryMaterial,
+		valueCategoryConsumable, valueCategoryOther:
+		return true
+	default:
+		return false
+	}
+}
+
+func mergeValueCategoryRecognition(current, updates map[string]float64) map[string]float64 {
+	result := make(map[string]float64, len(current)+len(updates))
+	for key, value := range current {
+		result[key] = value
+	}
+	for key, value := range updates {
+		result[strings.ToLower(strings.TrimSpace(key))] = value
+	}
+	return result
+}
+
 func encodeValueCategoryRecognition(values map[string]float64) string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
@@ -51,14 +73,15 @@ func decodeValueCategoryRecognition(value string) (map[string]float64, error) {
 	}
 	for _, entry := range strings.Split(value, ";") {
 		parts := strings.SplitN(strings.TrimSpace(entry), "|", 2)
-		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+		key := strings.ToLower(strings.TrimSpace(parts[0]))
+		if len(parts) != 2 || !validValueCategory(key) {
 			return nil, fmt.Errorf("invalid value category recognition %q", entry)
 		}
 		score, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
 		if err != nil || score < 0 || score > 100 {
 			return nil, fmt.Errorf("invalid value category score %q", entry)
 		}
-		result[strings.ToLower(strings.TrimSpace(parts[0]))] = score
+		result[key] = score
 	}
 	return result, nil
 }
@@ -106,11 +129,12 @@ func (a *App) valueScore(item catalogItem) valueScoreDetail {
 }
 
 func valueScoreWithConfig(item catalogItem, cfg RestockCfg) valueScoreDetail {
-	recognition := cfg.ValueCategoryRecognition[valueCategory(item)]
-	if recognition <= 0 {
-		recognition = cfg.ValueCategoryRecognition[valueCategoryOther]
+	category := valueCategory(item)
+	recognition, ok := cfg.ValueCategoryRecognition[category]
+	if !ok {
+		recognition, ok = cfg.ValueCategoryRecognition[valueCategoryOther]
 	}
-	if recognition <= 0 {
+	if !ok {
 		recognition = 20
 	}
 	rarity := float64(item.Rarity)
@@ -128,7 +152,7 @@ func valueScoreWithConfig(item catalogItem, cfg RestockCfg) valueScoreDetail {
 		level = 70
 	}
 	raw := item.Price
-	if raw <= 0 {
+	if raw <= 10 {
 		raw = item.Value
 	}
 	pvfScore := 0.0
@@ -153,7 +177,7 @@ func valueScoreWithConfig(item catalogItem, cfg RestockCfg) valueScoreDetail {
 	}
 	totalWeight := wc + wr + wl + wp
 	if totalWeight <= 0 {
-		wc, wr, wl, wp, totalWeight = .5, .25, .15, .1, 1
+		return valueScoreDetail{Category: category, CategoryScore: recognition, RarityScore: rarity / 5, LevelScore: level / 70, PVFScore: pvfScore}
 	}
 	score := (wc*(recognition/100) + wr*(rarity/5) + wl*(level/70) + wp*pvfScore) / totalWeight
 	if score < 0 {
@@ -162,7 +186,7 @@ func valueScoreWithConfig(item catalogItem, cfg RestockCfg) valueScoreDetail {
 	if score > 1 {
 		score = 1
 	}
-	return valueScoreDetail{Category: valueCategory(item), Score: score, CategoryScore: recognition, RarityScore: rarity / 5, LevelScore: level / 70, PVFScore: pvfScore}
+	return valueScoreDetail{Category: category, Score: score, CategoryScore: recognition, RarityScore: rarity / 5, LevelScore: level / 70, PVFScore: pvfScore}
 }
 
 func (a *App) valueModelCenterPrice(item catalogItem) float64 {
