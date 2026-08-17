@@ -415,7 +415,22 @@ func WriteStoreEquipSlot(dst []byte, item shared.EquipmentCatalogItem, rng *rand
 	if intensify > 255 {
 		intensify = 255
 	}
+	if isTitleEquipment(item) {
+		intensify = 0
+	}
 	dst[6] = byte(intensify)
+}
+
+func isTitleEquipment(item shared.EquipmentCatalogItem) bool {
+	if item.ItemType == 2 {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(item.Slot)) {
+	case "titlename", "title", "title name":
+		return true
+	default:
+		return false
+	}
 }
 
 func safeRandIntn(randIntn func(int) int, n int) int {

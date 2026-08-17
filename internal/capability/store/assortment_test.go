@@ -72,6 +72,22 @@ func TestBuildItemPoolRandomizesEquipmentIntensifyWithinRange(t *testing.T) {
 	}
 }
 
+func TestBuildItemPoolDoesNotIntensifyTitles(t *testing.T) {
+	equipment := []shared.EquipmentCatalogItem{
+		{ID: 1100, ItemType: 2, Slot: "title name", Attach: "sealing"},
+		{ID: 1101, ItemType: 1, Slot: "title", Attach: "sealing"},
+	}
+	pool := BuildItemPool(equipment, nil, 7, 13)
+	if len(pool.Equipment) != len(equipment) {
+		t.Fatalf("equipment pool size = %d, want %d", len(pool.Equipment), len(equipment))
+	}
+	for _, entry := range pool.Equipment {
+		if got := entry.SlotBytes[6]; got != 0 {
+			t.Fatalf("title %d intensify=%d, want 0", entry.Item.ID, got)
+		}
+	}
+}
+
 func TestItemPoolDrawsNormalPrivateStoreLayoutWithoutDuplicates(t *testing.T) {
 	pool := &ItemPool{}
 	for id := 1; id <= 30; id++ {
