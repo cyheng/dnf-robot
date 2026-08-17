@@ -22,6 +22,14 @@ func TestOnlinePayloadKeepsDatabaseCIDSeparateFromCharacterSlot(t *testing.T) {
 	}
 }
 
+func TestOnlinePayloadCarriesPersistentGuildMembership(t *testing.T) {
+	service := SessionService{Env: &directLogoutEnv{}}
+	got := service.onlinePayload(robotcap.Info{UID: 17000001, CID: 900001, GuildID: 2}, 0, robotconfig.RuntimeConfig{})
+	if got.GuildID != 2 {
+		t.Fatalf("online guild id = %d, want 2", got.GuildID)
+	}
+}
+
 func TestOnlinePayloadUsesConfiguredGamePortInsteadOfStoredRobotPort(t *testing.T) {
 	service := SessionService{Env: &directLogoutEnv{}}
 	got := service.onlinePayload(robotcap.Info{

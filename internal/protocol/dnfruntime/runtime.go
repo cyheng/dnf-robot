@@ -279,6 +279,7 @@ func (rs *RobotSvc) RuntimeStatusMap() map[int]shared.RuntimeStatus {
 		item := shared.RuntimeStatus{
 			UID:                  int(snap.UID),
 			CID:                  int(snap.CID),
+			GuildID:              snap.GuildID,
 			State:                state,
 			StateName:            shared.StateName(state),
 			LastError:            int(snap.LastError),

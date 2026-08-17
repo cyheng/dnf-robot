@@ -1,6 +1,10 @@
 package dnf
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	"robot/internal/shared"
+)
 
 func (r *RobotVo) SetArea(village, area uint8, x, y uint16) {
 	r.mu.Lock()
@@ -25,6 +29,9 @@ func (r *RobotVo) SetAreaFrom(village, area uint8, x, y uint16, fromVillage, fro
 }
 
 func (r *RobotVo) setAreaFromLocked(village, area uint8, x, y uint16, fromVillage, fromArea uint16) {
+	if !shared.GenericAreaAllowed(r.GuildID, int(village)) {
+		return
+	}
 	areaChanged := r.CurVillage != village || r.CurArea != area
 	setArea := r.setArea
 	setArea[0] = village

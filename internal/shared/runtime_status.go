@@ -3,6 +3,7 @@ package shared
 type RuntimeStatus struct {
 	UID                  int
 	CID                  int
+	GuildID              int
 	State                int
 	StateName            string
 	LastError            int

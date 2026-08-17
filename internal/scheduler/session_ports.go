@@ -7,6 +7,7 @@ import (
 
 	robotcap "robot/internal/capability/robot"
 	robotaction "robot/internal/capability/robotaction"
+	robotconfig "robot/internal/capability/robotconfig"
 	"robot/internal/shared"
 )
 
@@ -128,6 +129,18 @@ func (e sessionActionEnv) RuntimeStatusMapFresh() map[int]robotcap.RuntimeStatus
 
 func (e sessionActionEnv) SelectRobots(req robotcap.CommandRequest) ([]robotcap.Info, error) {
 	return e.manager.repo().SelectRobots(req)
+}
+
+func (e sessionActionEnv) PrepareOnlineRobot(info robotcap.Info, rc robotconfig.RuntimeConfig) (robotcap.Info, error) {
+	if shared.GenericAreaAllowed(info.GuildID, info.Village) {
+		return info, nil
+	}
+	if st, ok := e.manager.runtimeStatus(info.UID); ok && robotcap.ActiveRuntimeStatus(st) {
+		return info, fmt.Errorf("cannot relocate active guild member uid=%d from unsafe generic area %d/%d", info.UID, info.Village, info.Area)
+	}
+	robotLogf("[AreaPolicy] uid=%d cid=%d guild_id=%d relocate_before_online village=%d area=%d\n",
+		info.UID, info.CID, info.GuildID, info.Village, info.Area)
+	return e.manager.storeMaintenance().RestoreAutoNormalPosition(info, rc, "guild_agit_generic_guard")
 }
 
 func (e sessionActionEnv) SendLogout(uid int) error {

@@ -84,6 +84,24 @@ func TestRestoreAutoNormalPositionCanReturnToEmptyGateArea(t *testing.T) {
 	}
 }
 
+func TestRestoreAutoNormalPositionExcludesGuildAgitForGuildMember(t *testing.T) {
+	env := &maintenanceTestEnv{
+		maps: []shared.MapCatalogItem{
+			{Village: shared.GuildAgitVillage, Area: 2, Use: true, Rectangles: []shared.MapRectangle{{XMin: 10, XMax: 20, YMin: 30, YMax: 40}}},
+			{Village: 1, Area: 0, Use: true, Rectangles: []shared.MapRectangle{{XMin: 100, XMax: 120, YMin: 130, YMax: 140}}},
+		},
+		locations: []shared.MapLocation{{Village: shared.GuildAgitVillage, Area: 2, X: 15, Y: 35}},
+	}
+	info := robotcap.Info{UID: 17000001, CID: 1, GuildID: 2, Level: 85}
+	normal, err := (Maintenance{Env: env}).RestoreAutoNormalPosition(info, robotconfig.Default(), "test")
+	if err != nil {
+		t.Fatalf("restore normal: %v", err)
+	}
+	if normal.Village != 1 || normal.Area != 0 {
+		t.Fatalf("normal=%+v, want non-agit village 1/0", normal)
+	}
+}
+
 func TestRestoreAutoNormalPositionStopsWhenDummyWriteFails(t *testing.T) {
 	wantErr := errors.New("write failed")
 	env := &maintenanceTestEnv{

@@ -115,6 +115,9 @@ func TestGuildInviteIsAutomaticallyAccepted(t *testing.T) {
 	if robot.PacketID != 42 {
 		t.Fatalf("packet id = %d, want 42", robot.PacketID)
 	}
+	if robot.GuildID != -1 {
+		t.Fatalf("pending guild id = %d, want -1", robot.GuildID)
+	}
 }
 
 func TestGuildInviteSendFailureKeepsPacketSequence(t *testing.T) {
@@ -134,5 +137,8 @@ func TestGuildInviteSendFailureKeepsPacketSequence(t *testing.T) {
 	robot.handleGuildPacketUnsafe(robotInboundPacket{data: inbound, size: len(inbound), flag: 0, typ: guildInviteNotification})
 	if robot.PacketID != 41 {
 		t.Fatalf("packet id = %d, want 41 after failed send", robot.PacketID)
+	}
+	if robot.GuildID != 0 {
+		t.Fatalf("failed accept changed guild id to %d", robot.GuildID)
 	}
 }

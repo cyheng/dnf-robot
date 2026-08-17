@@ -69,7 +69,7 @@ func (m Maintenance) randomNormalPosition(info robotcap.Info, rc robotconfig.Run
 	normal.Area = rc.SpawnArea
 	normal.X = env.RandBetween(rc.SpawnXMin, rc.SpawnXMax)
 	normal.Y = env.RandBetween(rc.SpawnYMin, rc.SpawnYMax)
-	normalMaps := FilterNormalMaps(maps)
+	normalMaps := shared.FilterGenericAreaMaps(FilterNormalMaps(maps), info.GuildID)
 	locations, locationErr := env.RobotLocations()
 	balanced := false
 	if locationErr == nil {

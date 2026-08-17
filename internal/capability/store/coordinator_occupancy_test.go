@@ -35,6 +35,24 @@ func TestStorePointCoordinatorKeepsSuccessfulOccupancyAfterClaimExpires(t *testi
 	}
 }
 
+func TestStorePointCoordinatorClaimForStoreWhereSkipsDisallowedArea(t *testing.T) {
+	configDir := t.TempDir()
+	writeStoreMapCatalog(t, configDir, []shared.MapCatalogItem{
+		{Village: shared.GuildAgitVillage, Area: 2, XMin: 1, XMax: 1, YMin: 1, YMax: 1, Use: true},
+		{Village: 9, Area: 0, XMin: 1, XMax: 1, YMin: 1, YMax: 1, Use: true},
+	})
+	coordinator := newTestPointCoordinator(configDir, nil)
+	position, ok := coordinator.ClaimForStoreWhere(1001, 210, func(pos Position) bool {
+		return pos.Village != shared.GuildAgitVillage
+	})
+	if !ok || position.Village != 9 {
+		t.Fatalf("filtered claim=%+v ok=%v, want village 9", position, ok)
+	}
+	if len(coordinator.pointClaims) != 1 {
+		t.Fatalf("claims=%v, disallowed point was claimed", coordinator.pointClaims)
+	}
+}
+
 func TestStorePointCoordinatorRestoresActiveOccupancyAfterRestart(t *testing.T) {
 	configDir := t.TempDir()
 	writeStoreMapCatalog(t, configDir, []shared.MapCatalogItem{{Village: 3, Area: 0, XMin: 0, XMax: 0, YMin: 0, YMax: 0, Use: true}})

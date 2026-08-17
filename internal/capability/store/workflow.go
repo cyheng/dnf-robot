@@ -4,6 +4,7 @@ import (
 	"fmt"
 	robotcap "robot/internal/capability/robot"
 	robotconfig "robot/internal/capability/robotconfig"
+	"robot/internal/shared"
 	"time"
 )
 
@@ -198,6 +199,7 @@ func (w Workflow) AutoUntilSuccess(st robotcap.RuntimeStatus, rc robotconfig.Run
 		info.Level = robots[0].Level
 		info.Job = robots[0].Job
 		info.Grow = robots[0].Grow
+		info.GuildID = robots[0].GuildID
 	}
 	if !env.BeginStoreBusy(info.UID) {
 		return AutoAttemptBusy
@@ -214,7 +216,8 @@ func (w Workflow) AutoUntilSuccess(st robotcap.RuntimeStatus, rc robotconfig.Run
 	points := env.StorePoints()
 	finalReason := StoreReasonFailed
 	attempts := 0
-	firstPos, ok := points.ClaimForStore(info.UID, rc.AutoStoreDurationSec)
+	allowedPosition := func(pos Position) bool { return shared.GenericAreaAllowed(info.GuildID, pos.Village) }
+	firstPos, ok := points.ClaimForStoreWhere(info.UID, rc.AutoStoreDurationSec, allowedPosition)
 	if !ok {
 		points.Flush()
 		return AutoAttemptBusy
@@ -243,7 +246,7 @@ func (w Workflow) AutoUntilSuccess(st robotcap.RuntimeStatus, rc robotconfig.Run
 			break
 		}
 		if try > 1 {
-			pos, ok = points.ClaimForStore(info.UID, rc.AutoStoreDurationSec)
+			pos, ok = points.ClaimForStoreWhere(info.UID, rc.AutoStoreDurationSec, allowedPosition)
 			if !ok {
 				env.Logf("[AutoStore] uid=%d no_store_point try=%d/%d\n", info.UID, try, tries)
 				break

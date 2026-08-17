@@ -30,6 +30,10 @@ type sessionLoginIPEnv interface {
 	RobotInnerIP() string
 }
 
+type sessionOnlinePrepareEnv interface {
+	PrepareOnlineRobot(robotcap.Info, robotconfig.RuntimeConfig) (robotcap.Info, error)
+}
+
 func (s SessionService) Online(req robotcap.CommandRequest, confirm bool, rc robotconfig.RuntimeConfig) (robotcap.CommandResult, error) {
 	return s.online(req, confirm, 0, rc)
 }
@@ -71,6 +75,12 @@ func (s SessionService) online(req robotcap.CommandRequest, confirm bool, disjoi
 	if rc.OnlineDispatchIntervalMS <= 0 {
 		userinfos := make([]shared.RuntimeOnlineUser, 0, len(robots))
 		for _, robot := range robots {
+			robot, err = prepareOnlineRobot(env, robot, rc)
+			if err != nil {
+				result.Failed++
+				result.Robots = append(result.Robots, robotcap.ActionResult{UID: robot.UID, CID: robot.CID, OK: false, State: robotcap.ActionStateFailed, Message: err.Error()})
+				continue
+			}
 			if err := env.EnsureWorldHornByCID(robot.CID); err != nil {
 				result.Failed++
 				result.Robots = append(result.Robots, robotcap.ActionResult{UID: robot.UID, CID: robot.CID, OK: false, State: robotcap.ActionStateFailed, Message: err.Error()})
@@ -95,6 +105,12 @@ func (s SessionService) online(req robotcap.CommandRequest, confirm bool, disjoi
 		}
 	} else {
 		for _, robot := range robots {
+			robot, err = prepareOnlineRobot(env, robot, rc)
+			if err != nil {
+				result.Failed++
+				result.Robots = append(result.Robots, robotcap.ActionResult{UID: robot.UID, CID: robot.CID, OK: false, State: robotcap.ActionStateFailed, Message: err.Error()})
+				continue
+			}
 			if err := env.EnsureWorldHornByCID(robot.CID); err != nil {
 				result.Failed++
 				result.Robots = append(result.Robots, robotcap.ActionResult{UID: robot.UID, CID: robot.CID, OK: false, State: robotcap.ActionStateFailed, Message: err.Error()})
@@ -115,6 +131,18 @@ func (s SessionService) online(req robotcap.CommandRequest, confirm bool, disjoi
 	}
 	s.confirmOnline(&result, time.Duration(rc.OnlineConfirmTimeoutMS)*time.Millisecond)
 	return result, nil
+}
+
+func prepareOnlineRobot(env SessionEnv, robot robotcap.Info, rc robotconfig.RuntimeConfig) (robotcap.Info, error) {
+	prepareEnv, ok := env.(sessionOnlinePrepareEnv)
+	if !ok {
+		return robot, nil
+	}
+	prepared, err := prepareEnv.PrepareOnlineRobot(robot, rc)
+	if err != nil {
+		return robot, err
+	}
+	return prepared, nil
 }
 
 func (s SessionService) Logout(req robotcap.CommandRequest) (robotcap.CommandResult, error) {
@@ -183,6 +211,7 @@ func (s SessionService) onlinePayload(robot robotcap.Info, disjointCost uint32, 
 		BirthX:         robot.X,
 		BirthY:         robot.Y,
 		CID:            robot.CID,
+		GuildID:        robot.GuildID,
 		CharacterSlot:  0,
 		IP:             s.Env.RobotConnectIP(),
 		LoginIP:        loginIP,

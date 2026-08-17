@@ -1,6 +1,7 @@
 package robotaction
 
 import (
+	"fmt"
 	robotcap "robot/internal/capability/robot"
 	robotconfig "robot/internal/capability/robotconfig"
 	robotspawn "robot/internal/capability/robotspawn"
@@ -125,6 +126,9 @@ func (s MoveService) AutoMove(info robotcap.Info, rc robotconfig.RuntimeConfig, 
 		targetX, targetY = s.followTarget(targetInfo, *follow, rc, maps)
 	} else {
 		targetX, targetY = s.randomTarget(info, rc, maps)
+	}
+	if (targetVillage != info.Village || targetArea != info.Area) && !shared.GenericAreaAllowed(info.GuildID, targetVillage) {
+		return fmt.Errorf("generic area transport is unavailable for guild member destination %d/%d", targetVillage, targetArea)
 	}
 	steps := s.Env.RandBetween(mathx.MaxInt(2, rc.MoveSteps-1), mathx.MinInt(8, rc.MoveSteps+2))
 	for step := 1; step <= steps; step++ {

@@ -143,22 +143,27 @@ func (c *PointCoordinator) Claim(uid int) (Position, bool) {
 
 func (c *PointCoordinator) ClaimWithLease(uid int, lease time.Duration) (Position, bool) {
 	lease = normalizePointLease(lease)
-	return c.claim(uid, lease, lease)
+	return c.claim(uid, lease, lease, nil)
 }
 
 // ClaimForStore keeps cleanup ownership for the longest possible configured
 // store lifetime while making a successful point reusable at this UID's exact
 // staggered store expiry.
 func (c *PointCoordinator) ClaimForStore(uid, storeDurationSec int) (Position, bool) {
+	return c.ClaimForStoreWhere(uid, storeDurationSec, nil)
+}
+
+// ClaimForStoreWhere applies destination policy before a point is claimed.
+func (c *PointCoordinator) ClaimForStoreWhere(uid, storeDurationSec int, allowed func(Position) bool) (Position, bool) {
 	cleanupLease := StorePointLeaseDuration(storeDurationSec)
 	reuseAfter := robotconfig.StoreDurationForUID(storeDurationSec, uid)
 	if reuseAfter < 0 {
 		reuseAfter = 0
 	}
-	return c.claim(uid, cleanupLease, reuseAfter)
+	return c.claim(uid, cleanupLease, reuseAfter, allowed)
 }
 
-func (c *PointCoordinator) claim(uid int, lease, reuseAfter time.Duration) (Position, bool) {
+func (c *PointCoordinator) claim(uid int, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
 	c.pointMu.Lock()
 	defer c.pointMu.Unlock()
 	now := time.Now()
@@ -168,32 +173,32 @@ func (c *PointCoordinator) claim(uid int, lease, reuseAfter time.Duration) (Posi
 		return Position{}, false
 	}
 	if pos, ok := c.claimAcrossAreas(func(area areaKey) (Position, bool) {
-		return c.claimFromArea(uid, area, PointStatusSuccess, true, now, lease, reuseAfter)
+		return c.claimFromArea(uid, area, PointStatusSuccess, true, now, lease, reuseAfter, allowed)
 	}); ok {
 		return pos, true
 	}
 	if pos, ok := c.claimAcrossAreas(func(area areaKey) (Position, bool) {
-		return c.claimFromArea(uid, area, PointStatusSuccess, false, now, lease, reuseAfter)
+		return c.claimFromArea(uid, area, PointStatusSuccess, false, now, lease, reuseAfter, allowed)
 	}); ok {
 		return pos, true
 	}
 	if pos, ok := c.claimAcrossAreas(func(area areaKey) (Position, bool) {
-		return c.claimFromArea(uid, area, PointStatusUnknown, true, now, lease, reuseAfter)
+		return c.claimFromArea(uid, area, PointStatusUnknown, true, now, lease, reuseAfter, allowed)
 	}); ok {
 		return pos, true
 	}
 	if pos, ok := c.claimAcrossAreas(func(area areaKey) (Position, bool) {
-		return c.claimFailedFromArea(uid, area, true, true, now, lease, reuseAfter)
+		return c.claimFailedFromArea(uid, area, true, true, now, lease, reuseAfter, allowed)
 	}); ok {
 		return pos, true
 	}
 	if pos, ok := c.claimAcrossAreas(func(area areaKey) (Position, bool) {
-		return c.claimFromArea(uid, area, PointStatusUnknown, false, now, lease, reuseAfter)
+		return c.claimFromArea(uid, area, PointStatusUnknown, false, now, lease, reuseAfter, allowed)
 	}); ok {
 		return pos, true
 	}
 	if pos, ok := c.claimAcrossAreas(func(area areaKey) (Position, bool) {
-		return c.claimFailedFromArea(uid, area, false, false, now, lease, reuseAfter)
+		return c.claimFailedFromArea(uid, area, false, false, now, lease, reuseAfter, allowed)
 	}); ok {
 		return pos, true
 	}
@@ -211,9 +216,13 @@ func (c *PointCoordinator) claimAcrossAreas(fn func(areaKey) (Position, bool)) (
 	return Position{}, false
 }
 
-func (c *PointCoordinator) claimFromArea(uid int, area areaKey, status string, packedOnly bool, now time.Time, lease, reuseAfter time.Duration) (Position, bool) {
+func (c *PointCoordinator) claimFromArea(uid int, area areaKey, status string, packedOnly bool, now time.Time, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
 	for _, idx := range c.byArea[area] {
 		pt := c.points[idx]
+		pos := Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, PointID: pt.ID}
+		if allowed != nil && !allowed(pos) {
+			continue
+		}
 		if status == PointStatusSuccess {
 			if !c.successPoints[pt.ID] {
 				continue
@@ -239,17 +248,22 @@ func (c *PointCoordinator) claimFromArea(uid int, area areaKey, status string, p
 		if status == PointStatusSuccess {
 			source = PointSourceSuccess
 		}
-		return Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, Source: source, PointID: pt.ID}, true
+		pos.Source = source
+		return pos, true
 	}
 	return Position{}, false
 }
 
-func (c *PointCoordinator) claimFailedFromArea(uid int, area areaKey, packedOnly, requireAreaSuccess bool, now time.Time, lease, reuseAfter time.Duration) (Position, bool) {
-	if requireAreaSuccess && !c.areaHasUsableSuccess(area, now, lease) {
+func (c *PointCoordinator) claimFailedFromArea(uid int, area areaKey, packedOnly, requireAreaSuccess bool, now time.Time, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
+	if requireAreaSuccess && !c.areaHasUsableSuccess(area, now, lease, allowed) {
 		return Position{}, false
 	}
 	for _, idx := range c.byArea[area] {
 		pt := c.points[idx]
+		pos := Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, Source: PointSourceFailedRetry, PointID: pt.ID}
+		if allowed != nil && !allowed(pos) {
+			continue
+		}
 		if packedOnly && !c.packedPoints[pt.ID] {
 			continue
 		}
@@ -261,14 +275,17 @@ func (c *PointCoordinator) claimFailedFromArea(uid int, area areaKey, packedOnly
 		}
 		claim := newPointClaim(uid, now, lease, reuseAfter)
 		c.setPointClaimLocked(pt.ID, claim)
-		return Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, Source: PointSourceFailedRetry, PointID: pt.ID}, true
+		return pos, true
 	}
 	return Position{}, false
 }
 
-func (c *PointCoordinator) areaHasUsableSuccess(area areaKey, now time.Time, lease time.Duration) bool {
+func (c *PointCoordinator) areaHasUsableSuccess(area areaKey, now time.Time, lease time.Duration, allowed func(Position) bool) bool {
 	for _, idx := range c.byArea[area] {
 		pt := c.points[idx]
+		if allowed != nil && !allowed(Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, PointID: pt.ID}) {
+			continue
+		}
 		if !c.successPoints[pt.ID] {
 			continue
 		}

@@ -31,6 +31,10 @@ func TestValidOnlineUserSeparatesDatabaseCIDFromCharacterSlot(t *testing.T) {
 		{name: "gate overflow", mutate: func(user *shared.RuntimeOnlineUser) { user.BirthGateArea = math.MaxUint8 + 1 }},
 		{name: "x negative", mutate: func(user *shared.RuntimeOnlineUser) { user.BirthX = -1 }},
 		{name: "y overflow", mutate: func(user *shared.RuntimeOnlineUser) { user.BirthY = math.MaxUint16 + 1 }},
+		{name: "guild member generic agit entry", mutate: func(user *shared.RuntimeOnlineUser) {
+			user.GuildID = 2
+			user.BirthVillage = shared.GuildAgitVillage
+		}},
 	}
 	if uint64(^uint(0)) > math.MaxUint32 {
 		tests = append(tests,

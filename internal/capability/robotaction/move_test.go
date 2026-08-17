@@ -89,3 +89,19 @@ func TestAutoMoveStopsAfterDispatchFailure(t *testing.T) {
 		t.Fatalf("move steps after failure = %d, want 2", len(env.steps))
 	}
 }
+
+func TestAutoMoveRejectsGuildAgitFollowForGuildMember(t *testing.T) {
+	env := &captureMoveEnv{}
+	service := MoveService{Env: env}
+	rc := robotconfig.RuntimeConfig{MoveSteps: 2, MoveSpeedMin: 100, MoveSpeedMax: 100}
+	source := robotcap.Info{UID: 101, GuildID: 2, Village: 1, Area: 0, X: 10, Y: 10}
+	target := FollowTarget{Village: shared.GuildAgitVillage, Area: 2, X: 100, Y: 100}
+
+	err := service.AutoMove(source, rc, nil, &target)
+	if err == nil {
+		t.Fatal("guild member agit follow was accepted")
+	}
+	if len(env.steps) != 0 {
+		t.Fatalf("unsafe move dispatched steps=%v", env.steps)
+	}
+}

@@ -3,6 +3,7 @@ package dnf
 import (
 	"encoding/binary"
 	"fmt"
+	"robot/internal/shared"
 	"time"
 )
 
@@ -79,6 +80,12 @@ func (r *RobotVo) handleLoginPacketUnsafe(packet robotInboundPacket) {
 
 	case 300:
 		if packet.flag != 0 || r.State != StateLogin {
+			return
+		}
+		if !shared.GenericAreaAllowed(r.GuildID, int(r.CurVillage)) {
+			fmt.Printf("[AreaPolicy] blocked unsafe login uid=%d cid=%d guild_id=%d village=%d area=%d\n",
+				r.UID, r.CID, r.GuildID, r.CurVillage, r.CurArea)
+			r.closeOutUnsafe()
 			return
 		}
 		pkt, err := buildSendPacket(37, 19, r.setPos[:], r.Cipher)

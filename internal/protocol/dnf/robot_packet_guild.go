@@ -30,6 +30,11 @@ func (r *RobotVo) handleGuildPacketUnsafe(packet robotInboundPacket) {
 		return
 	}
 	r.PacketID++
+	// The invite packet has no guild ID. Mark membership as pending immediately;
+	// reconnecting will replace this sentinel with the persistent database value.
+	if r.GuildID == 0 {
+		r.GuildID = -1
+	}
 	fmt.Printf("[GUILD_AUTO_ACCEPT] uid=%d guild_name_bytes=%d inviter_name_bytes=%d source=%s\n",
 		r.UID, guildNameSize, inviterNameSize, source)
 }

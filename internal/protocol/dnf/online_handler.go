@@ -71,6 +71,7 @@ func (dt *DnfTableDrive) dispatchOnline(task *RobotDnfTask, users []shared.Runti
 			Port:          user.Port,
 			UID:           uint32(user.UID),
 			CID:           user.CID,
+			GuildID:       user.GuildID,
 			CharacterSlot: uint8(user.CharacterSlot),
 			MaxReConn:     uint32(user.MaxReconnect),
 			ReDelay:       uint32(user.ReconnectDelay),
@@ -111,7 +112,8 @@ func validOnlineUser(user shared.RuntimeOnlineUser) bool {
 		user.Port > 0 && user.Port < 1<<16 &&
 		uint32Range(user.MaxReconnect) && uint32Range(user.ReconnectDelay) &&
 		uint8Range(user.BirthVillage) && uint8Range(user.BirthArea) && uint8Range(user.BirthGateArea) &&
-		uint16Range(user.BirthX) && uint16Range(user.BirthY)
+		uint16Range(user.BirthX) && uint16Range(user.BirthY) &&
+		shared.GenericAreaAllowed(user.GuildID, user.BirthVillage)
 }
 
 func positiveUint32(value int) bool { return value > 0 && uint64(value) <= math.MaxUint32 }

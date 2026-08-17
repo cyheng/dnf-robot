@@ -73,6 +73,25 @@ func TestSelectCharacUsesCharacterSlotWithoutNarrowingDatabaseCID(t *testing.T) 
 	}
 }
 
+func TestLoginCompletionClosesGuildMemberAtGenericAgitDestination(t *testing.T) {
+	conn := &captureSessionConn{}
+	robot := newLoginPacketTestRobot(t, conn)
+	robot.UID = 17000001
+	robot.CID = 1781
+	robot.GuildID = 2
+	robot.CurVillage = 8
+	robot.CurArea = 2
+
+	robot.handleLoginPacketUnsafe(robotInboundPacket{typ: 300})
+
+	if robot.State != StateStop || robot.Conn != nil {
+		t.Fatalf("unsafe login remained active state=%d conn=%v", robot.State, robot.Conn)
+	}
+	if len(conn.written) != 0 {
+		t.Fatalf("unsafe login wrote %d bytes before closing", len(conn.written))
+	}
+}
+
 func newLoginPacketTestRobot(t *testing.T, conn *captureSessionConn) *RobotVo {
 	t.Helper()
 	robot := NewRobotVo(nil)

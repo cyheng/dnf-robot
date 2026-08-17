@@ -16,6 +16,7 @@ type CreateRequest struct {
 type Info struct {
 	UID     int    `json:"uid"`
 	CID     int    `json:"cid"`
+	GuildID int    `json:"guild_id"`
 	Name    string `json:"name"`
 	Level   int    `json:"level"`
 	Job     int    `json:"job"`

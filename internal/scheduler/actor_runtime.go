@@ -120,7 +120,7 @@ func (r *RobotRuntime) AutoMove(uid int) robotcap.ActionResult {
 		rc := r.Config()
 		maps := r.manager.loadMapCatalog()
 		target, hasTarget := r.manager.currentFollowTarget(rc, maps)
-		info := robotcap.Info{UID: st.UID, CID: st.CID, Village: st.Village, Area: st.Area, X: st.X, Y: st.Y}
+		info := robotcap.Info{UID: st.UID, CID: st.CID, GuildID: st.GuildID, Village: st.Village, Area: st.Area, X: st.X, Y: st.Y}
 		var err error
 		if hasTarget {
 			err = r.manager.moveService().AutoMove(info, rc, maps, &target)
@@ -220,6 +220,7 @@ func (r *RobotRuntime) autoDisjointStore(uid int, st robotcap.RuntimeStatus, sho
 	}
 	var failureState storecap.AttemptFailureState
 	reuseSession := false
+	allowedPosition := func(pos storecap.Position) bool { return shared.GenericAreaAllowed(info.GuildID, pos.Village) }
 	for try := 1; try <= tries; try++ {
 		if shouldStop != nil && shouldStop() {
 			points.DiscardAttemptFailure(uid, &failureState)
@@ -227,7 +228,7 @@ func (r *RobotRuntime) autoDisjointStore(uid int, st robotcap.RuntimeStatus, sho
 			r.cleanupStoreSession(info, rc, "cancelled")
 			return robotcap.ActionResult{UID: uid, CID: info.CID, OK: false, State: robotcap.ActionStateCancelled}
 		}
-		pos, ok := points.ClaimForStore(uid, rc.AutoStoreDurationSec)
+		pos, ok := points.ClaimForStoreWhere(uid, rc.AutoStoreDurationSec, allowedPosition)
 		if !ok {
 			break
 		}

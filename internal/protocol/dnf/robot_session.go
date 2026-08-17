@@ -71,6 +71,7 @@ type UserLoginInfo struct {
 	TokenSize     uint32
 	UID           uint32
 	CID           int
+	GuildID       int
 	CharacterSlot uint8
 	MaxReConn     uint32
 	ReDelay       uint32
@@ -81,6 +82,7 @@ type UserLoginInfo struct {
 type RobotVo struct {
 	UID           uint32
 	CID           int
+	GuildID       int
 	CharacterSlot uint8
 	LoginIP       string
 	LocalIP       string
@@ -248,6 +250,7 @@ type RobotVo struct {
 type RobotSnapshot struct {
 	UID                  uint32
 	CID                  int
+	GuildID              int
 	State                ClientState
 	LastError            ClientError
 	DisconnectReason     DisconnectReason
@@ -339,6 +342,7 @@ func (r *RobotVo) publishSnapshotUnsafe() RobotSnapshot {
 	snapshot := RobotSnapshot{
 		UID:                  r.UID,
 		CID:                  r.CID,
+		GuildID:              r.GuildID,
 		State:                r.State,
 		LastError:            r.LastError,
 		DisconnectReason:     r.DisconReason,
@@ -377,6 +381,7 @@ func (r *RobotVo) Load(info UserLoginInfo) {
 	r.Port = info.Port
 	r.UID = info.UID
 	r.CID = info.CID
+	r.GuildID = info.GuildID
 	r.CharacterSlot = info.CharacterSlot
 	r.MaxReConn = info.MaxReConn
 	r.ReDelay = info.ReDelay

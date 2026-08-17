@@ -14,6 +14,8 @@ type RuntimeOnlineUser struct {
 
 	// CID is the database character identity (taiwan_cain.charac_info.charac_no).
 	CID int
+	// GuildID is the persistent taiwan_cain.charac_info guild membership.
+	GuildID int
 	// CharacterSlot is the one-byte character-list index used by CMD 4/12.
 	CharacterSlot int
 
