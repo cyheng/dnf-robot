@@ -23,9 +23,9 @@ const (
 
 func defaultValueCategoryRecognition() map[string]float64 {
 	return map[string]float64{
-		valueCategoryEquipment: 50, valueCategoryTitle: 85, valueCategoryCard: 75,
-		valueCategoryCreature: 90, valueCategoryArtifact: 80, valueCategoryBead: 70,
-		valueCategoryRecipe: 35, valueCategoryMaterial: 10, valueCategoryConsumable: 20,
+		valueCategoryEquipment: 45, valueCategoryTitle: 95, valueCategoryCard: 85,
+		valueCategoryCreature: 100, valueCategoryArtifact: 90, valueCategoryBead: 80,
+		valueCategoryRecipe: 40, valueCategoryMaterial: 10, valueCategoryConsumable: 20,
 		valueCategoryOther: 20,
 	}
 }

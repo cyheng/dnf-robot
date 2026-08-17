@@ -35,7 +35,7 @@ func DefaultConfig() Config {
 			EquipmentTradePolicy: tradePolicyPermissive, OtherTradePolicy: tradePolicyPermissive, EquipmentPriceProtection: equipmentPriceProtectionStandard, StackSizes: []int{500, 1000, 2000},
 			EquipmentQtyMin: 2, EquipmentQtyMax: 5, EquipInflateMin: 1, EquipInflateMax: 2,
 			LevelPriceRate: 0.15, RarityPriceRate: 0.30,
-			ValueModelEnabled: false, ValueCategoryWeight: 0.50, ValueRarityWeight: 0.25, ValueLevelWeight: 0.15, ValuePVFWeight: 0.10,
+			ValueModelEnabled: true, ValueCategoryWeight: 0.45, ValueRarityWeight: 0.25, ValueLevelWeight: 0.20, ValuePVFWeight: 0.10,
 			ValueCurveSpan: 6, ValueBasePrice: 1000, ValueCategoryRecognition: defaultValueCategoryRecognition(),
 			UpgradeMin: 7, UpgradeMax: 13, UpgradePriceRate: 0.08, RandLow: 0.9, RandHigh: 1.1,
 			MaxActions: defaultMarketMaxActions, MaxConcurrent: 8, MaxResultActions: 200,

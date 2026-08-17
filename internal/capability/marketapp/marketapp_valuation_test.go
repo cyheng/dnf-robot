@@ -10,6 +10,7 @@ func TestValueCategoryUsesEconomicGroups(t *testing.T) {
 	}{
 		{"title", catalogItem{Kind: "equipment", ItemType: 2, Slot: "title name"}, valueCategoryTitle},
 		{"card", catalogItem{Kind: "stackable", Path: "stackable/monstercard/example.stk"}, valueCategoryCard},
+		{"bead", catalogItem{Kind: "stackable", Path: "stackable/professional/bead/example.stk"}, valueCategoryBead},
 		{"recipe", catalogItem{Kind: "stackable", Path: "stackable/recipe/example.stk"}, valueCategoryRecipe},
 		{"material", catalogItem{Kind: "stackable", Path: "stackable/material/example.stk", Slot: "material"}, valueCategoryMaterial},
 		{"equipment", catalogItem{Kind: "equipment", ItemType: 1, Slot: "weapon"}, valueCategoryEquipment},
@@ -18,6 +19,19 @@ func TestValueCategoryUsesEconomicGroups(t *testing.T) {
 		if got := valueCategory(tt.item); got != tt.want {
 			t.Errorf("%s category=%q want %q", tt.name, got, tt.want)
 		}
+	}
+}
+
+func TestDefaultValueModelUsesTunedVMDistribution(t *testing.T) {
+	cfg := DefaultConfig().Restock
+	if !cfg.ValueModelEnabled {
+		t.Fatal("value model should be enabled by default")
+	}
+	if cfg.ValueCategoryWeight != .45 || cfg.ValueRarityWeight != .25 || cfg.ValueLevelWeight != .20 || cfg.ValuePVFWeight != .10 {
+		t.Fatalf("unexpected default value weights: %+v", cfg)
+	}
+	if cfg.ValueCurveSpan != 6 || cfg.ValueBasePrice != 1000 {
+		t.Fatalf("unexpected default value curve: %+v", cfg)
 	}
 }
 
