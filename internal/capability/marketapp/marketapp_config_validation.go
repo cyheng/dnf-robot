@@ -132,6 +132,25 @@ func validateMarketConfig(cfg Config) error {
 	if !finiteInRange(r.RandLow, 0, marketConfigMaxRand) || r.RandLow <= 0 || !finiteInRange(r.RandHigh, 0, marketConfigMaxRand) || r.RandHigh < r.RandLow {
 		return fmt.Errorf("auction_price random multipliers must be finite, positive, and satisfy low <= high")
 	}
+	for key, value := range map[string]float64{
+		"value_category_weight": r.ValueCategoryWeight, "value_rarity_weight": r.ValueRarityWeight,
+		"value_level_weight": r.ValueLevelWeight, "value_pvf_weight": r.ValuePVFWeight,
+	} {
+		if !finiteInRange(value, 0, 1) {
+			return fmt.Errorf("auction_price.%s must be finite and in 0..1", key)
+		}
+	}
+	if !finiteInRange(r.ValueCurveSpan, 1, 12) {
+		return fmt.Errorf("auction_price.value_curve_span must be finite and in 1..12")
+	}
+	if r.ValueBasePrice <= 0 {
+		return fmt.Errorf("auction_price.value_base_price must be positive")
+	}
+	for key, value := range r.ValueCategoryRecognition {
+		if strings.TrimSpace(key) == "" || !finiteInRange(value, 0, 100) {
+			return fmt.Errorf("auction_price.value_category_recognition contains invalid %q", key)
+		}
+	}
 	if err := validateMarketLimits("auction_price", r.MaxActions, r.MaxConcurrent); err != nil {
 		return err
 	}

@@ -34,6 +34,24 @@ func (a *App) auctionUnitPriceFor(item catalogItem, base int32, batchInflate flo
 			return a.randomPriceInRange(priceRange.MinPrice, priceRange.MaxPrice)
 		}
 	}
+	if cfg.Restock.ValueModelEnabled {
+		price := valueModelCenterPriceWithConfig(item, cfg.Restock)
+		if item.Kind == "equipment" {
+			if batchInflate <= 0 {
+				batchInflate = 1
+			}
+			price *= batchInflate
+			price *= auctionUpgradePriceFactor(upgrade, cfg.Restock.UpgradePriceRate)
+		}
+		low, high := cfg.Restock.RandLow, cfg.Restock.RandHigh
+		if low > 0 && high > 0 && low != high {
+			if high < low {
+				high = low
+			}
+			price *= low + a.randomFloat64()*(high-low)
+		}
+		return boundedAuctionPrice(price)
+	}
 	if base <= 0 {
 		base = 1000
 	}
@@ -81,8 +99,28 @@ func (a *App) auctionPriceBounds(item catalogItem) (int32, int32) {
 	if priceRange, ok := a.customPriceRange(item.ItemID); ok {
 		return priceRange.MinPrice, priceRange.MaxPrice
 	}
-	base := float64(a.protectedEquipmentBasePrice(item, marketBasePrice(item)))
 	cfg := a.configSnapshot()
+	if cfg.Restock.ValueModelEnabled {
+		center := valueModelCenterPriceWithConfig(item, cfg.Restock)
+		lowRand, highRand := cfg.Restock.RandLow, cfg.Restock.RandHigh
+		if lowRand <= 0 {
+			lowRand = 1
+		}
+		if highRand < lowRand {
+			highRand = lowRand
+		}
+		low, high := center*lowRand, center*highRand
+		if item.Kind == "equipment" {
+			low *= float64(cfg.Restock.EquipInflateMin)
+			high *= float64(cfg.Restock.EquipInflateMax)
+			if auctionEquipmentCanUpgrade(item) {
+				low *= auctionUpgradePriceFactor(cfg.Restock.UpgradeMin, cfg.Restock.UpgradePriceRate)
+				high *= auctionUpgradePriceFactor(cfg.Restock.UpgradeMax, cfg.Restock.UpgradePriceRate)
+			}
+		}
+		return boundedAuctionPrice(low), boundedAuctionPrice(high)
+	}
+	base := float64(a.protectedEquipmentBasePrice(item, marketBasePrice(item)))
 	base *= auctionQualityPriceFactor(item, cfg.Restock)
 	lowRand, highRand := cfg.Restock.RandLow, cfg.Restock.RandHigh
 	if lowRand <= 0 {

@@ -83,6 +83,8 @@ type App struct {
 	equipmentPriceCaps  map[int]shared.EquipmentLevelPriceCap
 	runtimeFilesWatched atomic.Bool
 	rebuildRunning      atomic.Bool
+	marketKindsActual   int
+	marketKindsCachedAt time.Time
 }
 
 type auctionRejectedState struct {
@@ -487,6 +489,33 @@ func (a *App) UpdateConfig(req ConfigUpdateRequest) (Status, error) {
 	}
 	if req.RandHigh != nil {
 		cfg.Restock.RandHigh = *req.RandHigh
+	}
+	if req.ValueModelEnabled != nil {
+		cfg.Restock.ValueModelEnabled = *req.ValueModelEnabled
+	}
+	if req.ValueCategoryWeight != nil {
+		cfg.Restock.ValueCategoryWeight = *req.ValueCategoryWeight
+	}
+	if req.ValueRarityWeight != nil {
+		cfg.Restock.ValueRarityWeight = *req.ValueRarityWeight
+	}
+	if req.ValueLevelWeight != nil {
+		cfg.Restock.ValueLevelWeight = *req.ValueLevelWeight
+	}
+	if req.ValuePVFWeight != nil {
+		cfg.Restock.ValuePVFWeight = *req.ValuePVFWeight
+	}
+	if req.ValueCurveSpan != nil {
+		cfg.Restock.ValueCurveSpan = *req.ValueCurveSpan
+	}
+	if req.ValueBasePrice != nil {
+		cfg.Restock.ValueBasePrice = *req.ValueBasePrice
+	}
+	if req.ValueCategoryRecognition != nil {
+		cfg.Restock.ValueCategoryRecognition = make(map[string]float64, len(req.ValueCategoryRecognition))
+		for key, value := range req.ValueCategoryRecognition {
+			cfg.Restock.ValueCategoryRecognition[strings.ToLower(strings.TrimSpace(key))] = value
+		}
 	}
 	if req.CustomPriceEnabled != nil {
 		cfg.Restock.CustomPriceEnabled = *req.CustomPriceEnabled

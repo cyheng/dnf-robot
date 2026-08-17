@@ -110,6 +110,10 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	cfg.Restock.BlockedItemIDs = []uint32{100, 300}
 	cfg.Restock.AllowedItemIDs = []uint32{200, 400}
 	cfg.Restock.EquipmentPriceProtection = equipmentPriceProtectionStrict
+	cfg.Restock.ValueModelEnabled = true
+	cfg.Restock.ValueCurveSpan = 4.5
+	cfg.Restock.ValueBasePrice = 2500
+	cfg.Restock.ValueCategoryRecognition[valueCategoryBead] = 73
 	if err := writeMarketConfig(path, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +129,12 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	}
 	if loaded.Restock.EquipmentPriceProtection != equipmentPriceProtectionStrict {
 		t.Fatalf("equipment price protection = %q, want strict", loaded.Restock.EquipmentPriceProtection)
+	}
+	if !loaded.Restock.ValueModelEnabled || loaded.Restock.ValueCurveSpan != 4.5 || loaded.Restock.ValueBasePrice != 2500 {
+		t.Fatalf("value model settings did not round trip: %+v", loaded.Restock)
+	}
+	if got := loaded.Restock.ValueCategoryRecognition[valueCategoryBead]; got != 73 {
+		t.Fatalf("bead recognition = %v, want 73", got)
 	}
 }
 

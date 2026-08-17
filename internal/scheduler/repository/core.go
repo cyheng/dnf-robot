@@ -3,18 +3,22 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"robot/internal/foundation/lockhub"
 )
 
 type SQLRepository struct {
-	db               *sql.DB
-	colCache         map[string]map[string]bool
-	tableExistsMu    lockhub.Locker
-	tableExistsCache map[string]*tableExistsEntry
-	locks            *lockhub.Hub
-	schemaMu         lockhub.Locker
-	schemaReady      bool
+	db                     *sql.DB
+	colCache               map[string]map[string]bool
+	tableExistsMu          lockhub.Locker
+	tableExistsCache       map[string]*tableExistsEntry
+	locks                  *lockhub.Hub
+	schemaMu               lockhub.Locker
+	schemaReady            bool
+	storePermissionMu      lockhub.Locker
+	storePermissionRetryAt time.Time
+	storePermissionCause   string
 }
 
 func NewSQLRepository(db *sql.DB) *SQLRepository {

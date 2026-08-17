@@ -29,6 +29,7 @@ var marketConfigKeys = map[string]map[string]bool{
 		"equip_inflate_min": true, "equip_inflate_max": true,
 		"level_price_rate": true, "rarity_price_rate": true,
 		"upgrade_min": true, "upgrade_max": true, "upgrade_price_rate": true,
+		"value_model_enabled": true, "value_category_weight": true, "value_rarity_weight": true, "value_level_weight": true, "value_pvf_weight": true, "value_curve_span": true, "value_base_price": true, "value_category_recognition": true,
 		"rand_low": true, "rand_high": true, "custom_price_enabled": true, "custom_price_file": true,
 		"max_actions": true, "max_concurrent": true, "max_result_actions": true, "per_item_delay_ms": true,
 	},
@@ -141,7 +142,7 @@ func validateMarketValue(section, key, value string) error {
 		}
 	case "system_owner.rotate_every",
 		"auction_price.equipment_qty_min", "auction_price.equipment_qty_max",
-		"auction_price.equipment_level_min", "auction_price.equipment_level_max",
+		"auction_price.equipment_level_min", "auction_price.equipment_level_max", "auction_price.value_base_price",
 		"auction_price.equip_inflate_min", "auction_price.equip_inflate_max",
 		"auction_price.upgrade_min", "auction_price.upgrade_max",
 		"auction_price.max_actions", "auction_price.max_concurrent",
@@ -151,14 +152,14 @@ func validateMarketValue(section, key, value string) error {
 		if _, err := strconv.Atoi(value); err != nil {
 			return fmt.Errorf("must be an integer")
 		}
-	case "auction_price.level_price_rate", "auction_price.rarity_price_rate",
+	case "auction_price.level_price_rate", "auction_price.rarity_price_rate", "auction_price.value_category_weight", "auction_price.value_rarity_weight", "auction_price.value_level_weight", "auction_price.value_pvf_weight", "auction_price.value_curve_span",
 		"auction_price.upgrade_price_rate", "auction_price.rand_low", "auction_price.rand_high",
 		"auction_collect.in_range_probability", "auction_collect.out_of_range_probability":
 		parsed, err := strconv.ParseFloat(value, 64)
 		if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
 			return fmt.Errorf("must be a number")
 		}
-	case "auction_price.custom_price_enabled",
+	case "auction_price.custom_price_enabled", "auction_price.value_model_enabled",
 		"auction_collect.enabled", "auction_collect.include_system_owners", "auction_collect.price_range_enabled",
 		"auto.enabled", "auto.continue_on_error":
 		if value != "true" && value != "false" {
@@ -166,6 +167,10 @@ func validateMarketValue(section, key, value string) error {
 		}
 	case "auction_price.equipment_allowed_rarities", "auction_price.other_allowed_rarities":
 		if _, err := normalizeAllowedRarities(value); err != nil {
+			return err
+		}
+	case "auction_price.value_category_recognition":
+		if _, err := decodeValueCategoryRecognition(value); err != nil {
 			return err
 		}
 	case "auction_price.equipment_trade_policy", "auction_price.other_trade_policy":

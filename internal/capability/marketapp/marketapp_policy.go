@@ -334,7 +334,19 @@ func (a *App) currentMarketKinds(market string) (int, error) {
 // expected count is optional because it requires reading the current iteminfo
 // and PVF export; callers that poll should request it only on the first sample.
 func (a *App) AuctionKindsProgress(includeExpected bool) (MarketKindsProgress, error) {
-	actual, err := a.currentMarketKinds(marketNameAuction)
+	now := time.Now()
+	a.stateMu.RLock()
+	actual, cachedAt := a.marketKindsActual, a.marketKindsCachedAt
+	a.stateMu.RUnlock()
+	var err error
+	if cachedAt.IsZero() || now.Sub(cachedAt) >= 5*time.Second {
+		actual, err = a.currentMarketKinds(marketNameAuction)
+		if err == nil {
+			a.stateMu.Lock()
+			a.marketKindsActual, a.marketKindsCachedAt = actual, now
+			a.stateMu.Unlock()
+		}
+	}
 	progress := MarketKindsProgress{Actual: actual}
 	if err != nil {
 		return progress, err

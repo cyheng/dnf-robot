@@ -2,9 +2,13 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/go-sql-driver/mysql"
 
 	equipcap "robot/internal/capability/equipment"
 	robotcap "robot/internal/capability/robot"
@@ -152,6 +156,9 @@ func (r *SQLRepository) EnsureStorePermission(uid, cid int) (storecap.Permission
 	if uid <= 0 || cid <= 0 {
 		return storecap.PermissionStatus{}, fmt.Errorf("invalid store permission uid=%d cid=%d", uid, cid)
 	}
+	if err := r.storePermissionCooldownError(time.Now()); err != nil {
+		return storecap.PermissionStatus{}, err
+	}
 	if _, err := r.ClearTradePunish(uid); err != nil {
 		return storecap.PermissionStatus{}, err
 	}
@@ -182,6 +189,7 @@ func (r *SQLRepository) EnsureStorePermission(uid, cid int) (storecap.Permission
 	}
 	for _, step := range steps {
 		if _, err := tx.Exec(step.query, step.args...); err != nil {
+			r.recordStorePermissionFailure(err, time.Now())
 			return storecap.PermissionStatus{}, err
 		}
 	}
@@ -194,6 +202,7 @@ func (r *SQLRepository) EnsureStorePermission(uid, cid int) (storecap.Permission
 		(SELECT COUNT(*) FROM taiwan_login.dnf_event_entry WHERE event_id=50002 AND m_id=? AND charac_no=?)`,
 		uid, uid, uid, uid, uid, cid,
 	).Scan(&status.Premium, &status.Miles, &status.ProdUser, &status.PUUser, &status.EventEntry); err != nil {
+		r.recordStorePermissionFailure(err, time.Now())
 		return storecap.PermissionStatus{}, fmt.Errorf("verify store permission uid=%d cid=%d: %w", uid, cid, err)
 	}
 	if !storePermissionReady(status) {
@@ -201,10 +210,41 @@ func (r *SQLRepository) EnsureStorePermission(uid, cid int) (storecap.Permission
 			uid, cid, status.Premium, status.Miles, status.ProdUser, status.PUUser, status.EventEntry)
 	}
 	if err := tx.Commit(); err != nil {
+		r.recordStorePermissionFailure(err, time.Now())
 		return storecap.PermissionStatus{}, fmt.Errorf("commit store permission uid=%d cid=%d: %w", uid, cid, err)
 	}
 	committed = true
+	r.clearStorePermissionCooldown()
 	return status, nil
+}
+
+const storePermissionDatabaseCooldown = 60 * time.Second
+
+func (r *SQLRepository) storePermissionCooldownError(now time.Time) error {
+	r.storePermissionMu.Lock()
+	defer r.storePermissionMu.Unlock()
+	if r.storePermissionRetryAt.IsZero() || !now.Before(r.storePermissionRetryAt) {
+		return nil
+	}
+	return fmt.Errorf("store permission database cooldown until %s: %s", r.storePermissionRetryAt.Format(time.RFC3339), r.storePermissionCause)
+}
+
+func (r *SQLRepository) recordStorePermissionFailure(err error, now time.Time) {
+	var mysqlErr *mysql.MySQLError
+	if !errors.As(err, &mysqlErr) || mysqlErr.Number != 145 {
+		return
+	}
+	r.storePermissionMu.Lock()
+	r.storePermissionRetryAt = now.Add(storePermissionDatabaseCooldown)
+	r.storePermissionCause = err.Error()
+	r.storePermissionMu.Unlock()
+}
+
+func (r *SQLRepository) clearStorePermissionCooldown() {
+	r.storePermissionMu.Lock()
+	r.storePermissionRetryAt = time.Time{}
+	r.storePermissionCause = ""
+	r.storePermissionMu.Unlock()
 }
 
 func storePermissionReady(status storecap.PermissionStatus) bool {

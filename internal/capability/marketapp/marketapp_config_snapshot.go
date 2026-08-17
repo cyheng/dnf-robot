@@ -41,6 +41,12 @@ func cloneConfig(cfg Config) Config {
 	out.Restock.BlockedItemIDs = append([]uint32(nil), cfg.Restock.BlockedItemIDs...)
 	out.Restock.AllowedItemIDs = append([]uint32(nil), cfg.Restock.AllowedItemIDs...)
 	out.Restock.StackSizes = append([]int(nil), cfg.Restock.StackSizes...)
+	if cfg.Restock.ValueCategoryRecognition != nil {
+		out.Restock.ValueCategoryRecognition = make(map[string]float64, len(cfg.Restock.ValueCategoryRecognition))
+		for key, value := range cfg.Restock.ValueCategoryRecognition {
+			out.Restock.ValueCategoryRecognition[key] = value
+		}
+	}
 	out.Cera.Comments = cloneStringMap(cfg.Cera.Comments)
 	out.Cera.Items = append([]ceraRow(nil), cfg.Cera.Items...)
 	out.Auto.Markets = append([]string(nil), cfg.Auto.Markets...)

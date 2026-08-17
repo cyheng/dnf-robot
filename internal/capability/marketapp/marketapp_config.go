@@ -35,6 +35,8 @@ func DefaultConfig() Config {
 			EquipmentTradePolicy: tradePolicyPermissive, OtherTradePolicy: tradePolicyPermissive, EquipmentPriceProtection: equipmentPriceProtectionStandard, StackSizes: []int{500, 1000, 2000},
 			EquipmentQtyMin: 2, EquipmentQtyMax: 5, EquipInflateMin: 1, EquipInflateMax: 2,
 			LevelPriceRate: 0.15, RarityPriceRate: 0.30,
+			ValueModelEnabled: false, ValueCategoryWeight: 0.50, ValueRarityWeight: 0.25, ValueLevelWeight: 0.15, ValuePVFWeight: 0.10,
+			ValueCurveSpan: 6, ValueBasePrice: 1000, ValueCategoryRecognition: defaultValueCategoryRecognition(),
 			UpgradeMin: 7, UpgradeMax: 13, UpgradePriceRate: 0.08, RandLow: 0.9, RandHigh: 1.1,
 			MaxActions: defaultMarketMaxActions, MaxConcurrent: 8, MaxResultActions: 200,
 		},
@@ -119,6 +121,18 @@ func decodeMarketINI(ini *foundationconfig.INIConfig) (Config, error) {
 	c.Restock.UpgradePriceRate = iniFloat(ini, "auction_price", "upgrade_price_rate", d.Restock.UpgradePriceRate)
 	c.Restock.RandLow = iniFloat(ini, "auction_price", "rand_low", d.Restock.RandLow)
 	c.Restock.RandHigh = iniFloat(ini, "auction_price", "rand_high", d.Restock.RandHigh)
+	c.Restock.ValueModelEnabled = iniBool(ini, "auction_price", "value_model_enabled", d.Restock.ValueModelEnabled)
+	c.Restock.ValueCategoryWeight = iniFloat(ini, "auction_price", "value_category_weight", d.Restock.ValueCategoryWeight)
+	c.Restock.ValueRarityWeight = iniFloat(ini, "auction_price", "value_rarity_weight", d.Restock.ValueRarityWeight)
+	c.Restock.ValueLevelWeight = iniFloat(ini, "auction_price", "value_level_weight", d.Restock.ValueLevelWeight)
+	c.Restock.ValuePVFWeight = iniFloat(ini, "auction_price", "value_pvf_weight", d.Restock.ValuePVFWeight)
+	c.Restock.ValueCurveSpan = iniFloat(ini, "auction_price", "value_curve_span", d.Restock.ValueCurveSpan)
+	c.Restock.ValueBasePrice = int32(ini.GetInt("auction_price", "value_base_price", int(d.Restock.ValueBasePrice)))
+	var valueErr error
+	c.Restock.ValueCategoryRecognition, valueErr = decodeValueCategoryRecognition(ini.GetString("auction_price", "value_category_recognition", encodeValueCategoryRecognition(d.Restock.ValueCategoryRecognition)))
+	if valueErr != nil {
+		return Config{}, valueErr
+	}
 	c.Restock.CustomPriceEnabled = iniBool(ini, "auction_price", "custom_price_enabled", d.Restock.CustomPriceEnabled)
 	c.Restock.MaxActions = ini.GetInt("auction_price", "max_actions", d.Restock.MaxActions)
 	c.Restock.MaxConcurrent = ini.GetInt("auction_price", "max_concurrent", d.Restock.MaxConcurrent)
@@ -178,6 +192,14 @@ func writeMarketConfig(path string, c Config) error {
 		"# 每级强化的价格加成比例；+10 以上还会使用同一比例叠加二次增长的损坏风险溢价。", "upgrade_price_rate = " + formatFloat(c.Restock.UpgradePriceRate),
 		"# 最终价格的最小随机倍率。", "rand_low = " + formatFloat(c.Restock.RandLow),
 		"# 最终价格的最大随机倍率。", "rand_high = " + formatFloat(c.Restock.RandHigh),
+		"# 是否启用基于类别认可度、稀有度、等级和 PVF 参考价的价值评分模型。", "value_model_enabled = " + strconv.FormatBool(c.Restock.ValueModelEnabled),
+		"# 价值模型中类别认可度的权重。", "value_category_weight = " + formatFloat(c.Restock.ValueCategoryWeight),
+		"# 价值模型中稀有度的权重。", "value_rarity_weight = " + formatFloat(c.Restock.ValueRarityWeight),
+		"# 价值模型中等级的权重。", "value_level_weight = " + formatFloat(c.Restock.ValueLevelWeight),
+		"# 价值模型中 PVF price/value 参考信号的权重。", "value_pvf_weight = " + formatFloat(c.Restock.ValuePVFWeight),
+		"# 价值分到价格的指数曲线跨度。", "value_curve_span = " + formatFloat(c.Restock.ValueCurveSpan),
+		"# 价值分为 0 时的基础金币价格。", fmt.Sprintf("value_base_price = %d", c.Restock.ValueBasePrice),
+		"# 有效价值分类认可度，格式为 category|score，使用分号分隔。", "value_category_recognition = " + encodeValueCategoryRecognition(c.Restock.ValueCategoryRecognition),
 		"# 是否启用 conf/market_item_price_ranges.json 中的物品独立最终价格范围；有效配置优先于上面的通用公式。", "custom_price_enabled = " + strconv.FormatBool(c.Restock.CustomPriceEnabled),
 		"# 单轮补货最多生成并执行的动作数；0 表示配置层不限制。", fmt.Sprintf("max_actions = %d", c.Restock.MaxActions),
 		"# 补货动作的最大并发工作数。", fmt.Sprintf("max_concurrent = %d", c.Restock.MaxConcurrent),
