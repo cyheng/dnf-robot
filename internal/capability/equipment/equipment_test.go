@@ -1,6 +1,7 @@
 package equipment
 
 import (
+	"encoding/binary"
 	"math/rand"
 	"testing"
 
@@ -25,6 +26,39 @@ func TestWriteEquipSlotUsesHighIntensify(t *testing.T) {
 		if raw[6] < 8 || raw[6] > 15 {
 			t.Fatalf("weapon intensify got %d want 8..15", raw[6])
 		}
+	}
+}
+
+func TestWriteEquipSlotUsesPVFDurability(t *testing.T) {
+	raw := make([]byte, 61)
+	WriteEquipSlot(raw, shared.EquipmentCatalogItem{ID: 1000, ItemType: 1, Durability: 18}, rand.New(rand.NewSource(1)), SlotOptions{})
+	if got := int(binary.LittleEndian.Uint16(raw[11:13])); got != 18 {
+		t.Fatalf("durability=%d, want 18", got)
+	}
+}
+
+func TestEquipmentSlotsNeedRepairValidatesConfiguredSlots(t *testing.T) {
+	items := map[int]shared.EquipmentCatalogItem{
+		100: {ID: 100, ItemType: 1, Level: 50, Rarity: 3, Durability: 20, UseJob: []int{1}},
+	}
+	rc := robotconfig.RuntimeConfig{EquipSlots: []int{1}, EquipRarityMin: 0, EquipRarityMax: 5}
+	raw := make([]byte, 12*61)
+	binary.LittleEndian.PutUint32(raw[2:6], 100)
+	binary.LittleEndian.PutUint16(raw[11:13], 20)
+	if EquipmentSlotsNeedRepair(raw, items, 50, 1, rc) {
+		t.Fatal("valid weapon was marked for repair")
+	}
+	binary.LittleEndian.PutUint16(raw[11:13], 21)
+	if !EquipmentSlotsNeedRepair(raw, items, 50, 1, rc) {
+		t.Fatal("durability different from PVF value was accepted")
+	}
+	binary.LittleEndian.PutUint16(raw[11:13], 20)
+	if !EquipmentSlotsNeedRepair(raw, items, 50, 2, rc) {
+		t.Fatal("wrong-job weapon was accepted")
+	}
+	binary.LittleEndian.PutUint32(raw[2:6], 0)
+	if !EquipmentSlotsNeedRepair(raw, items, 50, 1, rc) {
+		t.Fatal("missing weapon was accepted")
 	}
 }
 

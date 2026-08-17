@@ -27,6 +27,11 @@ type Info struct {
 	Y       int    `json:"y"`
 }
 
+type EquipmentRecord struct {
+	Info Info
+	Raw  []byte
+}
+
 type PositionUpdate struct {
 	UID     int
 	CID     int

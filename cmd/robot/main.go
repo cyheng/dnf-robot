@@ -172,6 +172,9 @@ func runMain() int {
 		marketApp.Shutdown()
 		runtimeFiles.Close()
 	}()
+	if _, err := manager.RepairRobotEquipment(); err != nil {
+		dnf.LogString(fmt.Sprintf("EQUIPMENT_REPAIR_FAILED err=%v\n", err))
+	}
 
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.RobotPort)
 	tcpServer := network.NewTCPServer(addr)

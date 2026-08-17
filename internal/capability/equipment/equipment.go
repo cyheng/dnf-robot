@@ -244,6 +244,43 @@ func BuildEquipmentSlots(items []shared.EquipmentCatalogItem, level int, job int
 	return raw
 }
 
+func EquipmentSlotsNeedRepair(raw []byte, itemsByID map[int]shared.EquipmentCatalogItem, level, job int, rc robotconfig.RuntimeConfig) bool {
+	slots := rc.EquipSlots
+	if len(slots) == 0 {
+		slots = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+	}
+	for _, slot := range slots {
+		if SlotToItemType(slot) == 0 {
+			continue
+		}
+		offset := (slot - 1) * 61
+		if offset+61 > len(raw) {
+			return true
+		}
+		slotRaw := raw[offset : offset+61]
+		itemID := int(binary.LittleEndian.Uint32(slotRaw[2:6]))
+		item, ok := itemsByID[itemID]
+		if !ok || item.ID <= 0 || item.ItemType != slot || item.Expire || !shared.ClientCompatibleEquipment(item) || item.Level > level || !UsableByJob(item.UseJob, job) {
+			return true
+		}
+		if rc.EquipRarityMax > 0 && (item.Rarity < rc.EquipRarityMin || item.Rarity > rc.EquipRarityMax) {
+			return true
+		}
+		durability := int(binary.LittleEndian.Uint16(slotRaw[11:13]))
+		expectedDurability := item.Durability
+		if expectedDurability < 0 {
+			expectedDurability = 0
+		}
+		if expectedDurability > 65535 {
+			expectedDurability = 65535
+		}
+		if durability != expectedDurability {
+			return true
+		}
+	}
+	return false
+}
+
 type setGroup struct {
 	key       string
 	bySlot    map[int][]shared.EquipmentCatalogItem
@@ -380,7 +417,14 @@ func WriteEquipSlot(dst []byte, item shared.EquipmentCatalogItem, rng *rand.Rand
 	}
 	dst[6] = byte(intensify)
 	binary.LittleEndian.PutUint32(dst[7:11], uint32(foundrand.BetweenAtLeast(rng, 0, 400000)))
-	dst[11] = byte(foundrand.BetweenAtLeast(rng, 10, 30))
+	durability := item.Durability
+	if durability < 0 {
+		durability = 0
+	}
+	if durability > 65535 {
+		durability = 65535
+	}
+	binary.LittleEndian.PutUint16(dst[11:13], uint16(durability))
 	if item.ItemType == 1 {
 		dst[51] = byte(foundrand.BetweenAtLeast(rng, opt.SmithingMin, opt.SmithingMax))
 	}

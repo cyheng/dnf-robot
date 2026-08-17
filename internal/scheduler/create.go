@@ -39,7 +39,20 @@ func (m *RobotManager) equipFromCatalog(cid int, level int, job int, rc robotcon
 		return nil
 	}
 	raw := equipcap.BuildEquipmentSlots(items, level, job, rc, m.randIntn, m.withRand)
+	if equipcap.EquipmentSlotsNeedRepair(raw, equipmentCatalogByID(items), level, job, rc) {
+		return fmt.Errorf("generated equipment is incomplete or invalid for cid=%d level=%d job=%d", cid, level, job)
+	}
 	return m.schemaRepo().SaveEquipmentSlots(cid, raw)
+}
+
+func equipmentCatalogByID(items []shared.EquipmentCatalogItem) map[int]shared.EquipmentCatalogItem {
+	out := make(map[int]shared.EquipmentCatalogItem, len(items))
+	for _, item := range items {
+		if item.ID > 0 {
+			out[item.ID] = item
+		}
+	}
+	return out
 }
 
 func (m *RobotManager) avatarFromCatalog(cid int, level int, job int, rc robotconfig.RuntimeConfig, items []shared.EquipmentCatalogItem) error {

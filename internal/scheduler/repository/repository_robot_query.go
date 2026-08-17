@@ -39,6 +39,27 @@ func (r *SQLRepository) SelectRobots(req robotcap.CommandRequest) ([]robotcap.In
 	return out, rows.Err()
 }
 
+func (r *SQLRepository) RobotEquipmentRecords() ([]robotcap.EquipmentRecord, error) {
+	rows, err := r.Query(`SELECT r.uid,r.cid,IFNULL(c.charac_name,''),IFNULL(c.lev,0),IFNULL(c.job,0),IFNULL(c.grow_type,0),UNCOMPRESS(i.equipslot)
+		FROM d_starsky.robot_registry r
+		JOIN taiwan_cain.charac_info c ON c.charac_no=r.cid AND c.m_id=r.uid AND c.delete_flag=0
+		JOIN taiwan_cain_2nd.inventory i ON i.charac_no=r.cid
+		ORDER BY r.uid`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]robotcap.EquipmentRecord, 0)
+	for rows.Next() {
+		var record robotcap.EquipmentRecord
+		if err := rows.Scan(&record.Info.UID, &record.Info.CID, &record.Info.Name, &record.Info.Level, &record.Info.Job, &record.Info.Grow, &record.Raw); err != nil {
+			return nil, err
+		}
+		out = append(out, record)
+	}
+	return out, rows.Err()
+}
+
 func (r *SQLRepository) FollowAccountVillageLastPlayed(account string) (int, bool, error) {
 	var village sql.NullInt64
 	err := r.QueryRow(`
