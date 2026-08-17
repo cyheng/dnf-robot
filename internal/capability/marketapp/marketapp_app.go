@@ -452,12 +452,6 @@ func (a *App) UpdateConfig(req ConfigUpdateRequest) (Status, error) {
 	if req.EquipmentQtyMax != nil {
 		cfg.Restock.EquipmentQtyMax = *req.EquipmentQtyMax
 	}
-	if req.EquipInflateMin != nil {
-		cfg.Restock.EquipInflateMin = *req.EquipInflateMin
-	}
-	if req.EquipInflateMax != nil {
-		cfg.Restock.EquipInflateMax = *req.EquipInflateMax
-	}
 	if req.EquipmentLevelMin != nil {
 		cfg.Restock.EquipmentLevelMin = *req.EquipmentLevelMin
 	}
@@ -479,26 +473,17 @@ func (a *App) UpdateConfig(req ConfigUpdateRequest) (Status, error) {
 	if req.RandHigh != nil {
 		cfg.Restock.RandHigh = *req.RandHigh
 	}
-	if req.ValueCategoryWeight != nil {
-		cfg.Restock.ValueCategoryWeight = *req.ValueCategoryWeight
+	if req.CategoryPriceRules != nil {
+		cfg.Restock.CategoryPriceRules = clonePriceRules(req.CategoryPriceRules)
 	}
-	if req.ValueRarityWeight != nil {
-		cfg.Restock.ValueRarityWeight = *req.ValueRarityWeight
+	if req.EquipmentMultiplierMin != nil {
+		cfg.Restock.EquipmentMultiplierMin = *req.EquipmentMultiplierMin
 	}
-	if req.ValueLevelWeight != nil {
-		cfg.Restock.ValueLevelWeight = *req.ValueLevelWeight
+	if req.EquipmentMultiplierMax != nil {
+		cfg.Restock.EquipmentMultiplierMax = *req.EquipmentMultiplierMax
 	}
-	if req.ValuePVFWeight != nil {
-		cfg.Restock.ValuePVFWeight = *req.ValuePVFWeight
-	}
-	if req.ValueCurveSpan != nil {
-		cfg.Restock.ValueCurveSpan = *req.ValueCurveSpan
-	}
-	if req.ValueBasePrice != nil {
-		cfg.Restock.ValueBasePrice = *req.ValueBasePrice
-	}
-	if req.ValueCategoryRecognition != nil {
-		cfg.Restock.ValueCategoryRecognition = mergeValueCategoryRecognition(cfg.Restock.ValueCategoryRecognition, req.ValueCategoryRecognition)
+	if req.EquipmentFinalMaxPrice != nil {
+		cfg.Restock.EquipmentFinalMaxPrice = *req.EquipmentFinalMaxPrice
 	}
 	if req.CustomPriceEnabled != nil {
 		cfg.Restock.CustomPriceEnabled = *req.CustomPriceEnabled

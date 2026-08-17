@@ -17,7 +17,7 @@ func TestEmbeddedWebAssetsContainRequiredContent(t *testing.T) {
 		{name: "index", content: indexHTML, required: []string{"TW Robot Web", appCSSPlaceholder, i18nJSPlaceholder, appJSPlaceholder, `id="languageButton"`, `id="partyCompatButton"`, `id="compatButton"`}},
 		{name: "css", content: appCSS, required: []string{":root{", ".service-lights", ".diagrow", ".market-policy-select", ".market-rule-article", ".market-rule-details", ".market-rule-chevrons"}},
 		{name: "i18n", content: i18nJS, required: []string{"I18N_MESSAGES", "tw_language", "toggleLanguage", "currentLanguage=localStorage.getItem(I18N_STORAGE_KEY)==='zh'?'zh':'en'", "auto.shout_interval", "喊话间隔", "validation.shout_interval", "market.section_status", "market.price_range_policy", "market.allowed_rarities", "上架稀有度（0-9）", "范围外回收概率"}},
-		{name: "javascript", content: appJS, required: []string{"async function api(", "openPartyCompatDialog", "openCompatDialog", "openDiagnosticsDialog", "restartRobot", "autoMailNotify", "autoShoutMin", "autoShoutMax", "auto.auto_shout_interval_min_sec", "auto.auto_shout_interval_max_sec", "marketEquipmentRarities", "marketOtherRarities", "marketBlockedItemIDs", "parseBlockedItemIDExpression", "formatBlockedItemIDs", "marketAllowedItemIDs", "parseAllowedItemIDExpression", "formatAllowedItemIDs", "allowed_item_id_expression", "Allowed item IDs", "物品 ID 白名单", "normalizeRarityDigits", "equipment_allowed_rarities", "other_allowed_rarities", "blocked_item_id_expression", "marketEquipmentLevelMin", "marketDetailsFormSection", "marketValueCategories", "marketPriceAdjustment", "value_category_weight", "value_category_recognition", "equipment_trade_policy", "other_trade_policy", "marketInRangeProbability", "marketApplyListingConfig", "marketKindsProgress", "种类（实际 / 预期）"}},
+		{name: "javascript", content: appJS, required: []string{"async function api(", "openPartyCompatDialog", "openCompatDialog", "openDiagnosticsDialog", "restartRobot", "autoMailNotify", "autoShoutMin", "autoShoutMax", "auto.auto_shout_interval_min_sec", "auto.auto_shout_interval_max_sec", "marketEquipmentRarities", "marketOtherRarities", "marketBlockedItemIDs", "parseBlockedItemIDExpression", "formatBlockedItemIDs", "marketAllowedItemIDs", "parseAllowedItemIDExpression", "formatAllowedItemIDs", "allowed_item_id_expression", "Allowed item IDs", "物品 ID 白名单", "normalizeRarityDigits", "equipment_allowed_rarities", "other_allowed_rarities", "blocked_item_id_expression", "marketEquipmentLevelMin", "marketDetailsFormSection", "marketCategoryPriceRules", "marketEquipmentExtras", "marketCommonPriceSettings", "category_price_rules", "equipment_multiplier_min", "equipment_multiplier_max", "equipment_final_max_price", "equipment_trade_policy", "other_trade_policy", "marketInRangeProbability", "marketApplyListingConfig", "marketKindsProgress", "种类（实际 / 预期）"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -35,12 +35,13 @@ func TestEmbeddedWebAssetsContainRequiredContent(t *testing.T) {
 
 func TestMarketPricingAndRuleSummaryAreBilingual(t *testing.T) {
 	for _, want := range []string{
-		"Price formula", "价格公式",
-		"Base price", "基础价格",
-		"Price preview", "价格预览",
-		"Category recognition", "分类认可度",
-		"Equipment price adjustment", "装备价格微调",
-		"Upgrade price rate", "强化加价率",
+		"Category unit-price ranges", "分类单价范围",
+		"Unit price range", "单价范围",
+		"Equipment price", "装备价格",
+		"Equipment price multiplier", "装备价格倍率",
+		"Other / Unclassified", "其他 / 未分类",
+		"Final maximum unit price", "最终单价上限",
+		"Upgrade price rate (nonlinear)", "强化加价率（非线性）",
 		"Final price fluctuation", "最终价格浮动",
 		"Rule details", "规则说明",
 		"Data sources and boundary", "数据来源与边界",
@@ -59,8 +60,7 @@ func TestMarketPricingAndRuleSummaryAreBilingual(t *testing.T) {
 		"currently deployed iteminfo.dat", "当前已发布的 iteminfo.dat",
 		"partially stocked ID is not topped up", "已有部分库存的 ID 不会继续补足",
 		"titles, creatures, artifacts, avatars", "称号、宠物、宠物装备、时装",
-		"item-specific price range has the highest priority", "启用物品独立价格范围时，其优先级最高",
-		"equipment-loss risk premium", "损坏风险溢价",
+		"item-specific price range has the highest priority", "启用物品独立价格范围时优先使用该范围",
 		"checks the database again", "再次查询数据库",
 		"player buyout listings", "玩家一口价商品",
 		"total price divided by quantity", "总价除以数量作为单价",
@@ -71,7 +71,7 @@ func TestMarketPricingAndRuleSummaryAreBilingual(t *testing.T) {
 			t.Errorf("market UI is missing bilingual text %q", want)
 		}
 	}
-	for _, removed := range []string{"equipment_price_protection", "marketEquipmentPriceProtection", "level_price_rate", "rarity_price_rate", "value_model_enabled"} {
+	for _, removed := range []string{"equipment_price_protection", "marketEquipmentPriceProtection", "level_price_rate", "rarity_price_rate", "value_model_enabled", "value_category_recognition", "value_curve_span", "value_base_price", "equip_inflate_min"} {
 		if strings.Contains(appJS, removed) {
 			t.Errorf("market UI still contains removed pricing setting %q", removed)
 		}
@@ -208,7 +208,7 @@ func TestRequestedChineseLabelsAndDialogWidths(t *testing.T) {
 
 func TestMarketDialogUsesCompactAlignedLayout(t *testing.T) {
 	for _, want := range []string{
-		"dialog.market{width:min(600px,96vw)",
+		"dialog.market{width:min(680px,96vw)",
 		"dialog.market .formgrid>label{white-space:nowrap}",
 		"dialog.market .market-range",
 		"showModal('Market',body,foot,'market')",
@@ -284,10 +284,16 @@ func TestMaxOnlineIsCappedAndDocumentsServiceRestart(t *testing.T) {
 func TestMarketFieldsUseOneCompactAlignment(t *testing.T) {
 	for _, want := range []string{
 		"dialog.market .formgrid{grid-template-columns:160px minmax(0,1fr)}",
-		"grid-template-columns:minmax(0,150px) max-content",
-		"grid-template-columns:68px 16px 68px max-content",
+		"grid-template-columns:minmax(0,180px) max-content",
+		"grid-template-columns:120px 16px 120px max-content",
 		"marketUpgradeMax",
 		"marketStackSizes",
+		"market-range-price",
+		"market-range-short",
+		"market-field-price",
+		"market-field-short",
+		"grid-template-columns:140px 16px 140px max-content",
+		"grid-template-columns:72px 16px 72px max-content",
 	} {
 		if !strings.Contains(appCSS+appJS, want) {
 			t.Fatalf("compact market alignment is missing %q", want)

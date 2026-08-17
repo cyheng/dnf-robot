@@ -1,5 +1,7 @@
 package marketapp
 
+import "math"
+
 func (a *App) price(base int32) int32 {
 	if base <= 0 {
 		base = 1
@@ -19,19 +21,20 @@ func (a *App) price(base int32) int32 {
 	return int32(v)
 }
 
-func (a *App) auctionUnitPriceFor(item catalogItem, batchInflate float64, upgrade int) int32 {
+func (a *App) auctionUnitPriceFor(item catalogItem, equipmentMultiplier float64, upgrade int) int32 {
 	cfg := a.configSnapshot()
 	if item.ItemID > 0 {
 		if priceRange, ok := a.customPriceRange(item.ItemID); ok {
 			return a.randomPriceInRange(priceRange.MinPrice, priceRange.MaxPrice)
 		}
 	}
-	price := valueModelCenterPriceWithConfig(item, cfg.Restock)
-	if item.Kind == "equipment" {
-		if batchInflate <= 0 {
-			batchInflate = 1
+	price := configuredCenterPrice(item, cfg.Restock)
+	category := valueCategory(item)
+	if category == valueCategoryEquipment {
+		if equipmentMultiplier <= 0 {
+			equipmentMultiplier = 1
 		}
-		price *= batchInflate
+		price *= equipmentMultiplier
 		price *= auctionUpgradePriceFactor(upgrade, cfg.Restock.UpgradePriceRate)
 	}
 	low, high := cfg.Restock.RandLow, cfg.Restock.RandHigh
@@ -40,6 +43,19 @@ func (a *App) auctionUnitPriceFor(item catalogItem, batchInflate float64, upgrad
 			high = low
 		}
 		price *= low + a.randomFloat64()*(high-low)
+	}
+	if category != valueCategoryEquipment {
+		if rule, ok := cfg.Restock.CategoryPriceRules[category]; ok {
+			if price < float64(rule.MinPrice) {
+				price = float64(rule.MinPrice)
+			}
+			if price > float64(rule.MaxPrice) {
+				price = float64(rule.MaxPrice)
+			}
+		}
+	}
+	if category == valueCategoryEquipment && cfg.Restock.EquipmentFinalMaxPrice > 0 && price > float64(cfg.Restock.EquipmentFinalMaxPrice) {
+		price = float64(cfg.Restock.EquipmentFinalMaxPrice)
 	}
 	return boundedAuctionPrice(price)
 }
@@ -63,7 +79,7 @@ func (a *App) auctionPriceBounds(item catalogItem) (int32, int32) {
 		return priceRange.MinPrice, priceRange.MaxPrice
 	}
 	cfg := a.configSnapshot()
-	center := valueModelCenterPriceWithConfig(item, cfg.Restock)
+	center := configuredCenterPrice(item, cfg.Restock)
 	lowRand, highRand := cfg.Restock.RandLow, cfg.Restock.RandHigh
 	if lowRand <= 0 {
 		lowRand = 1
@@ -72,12 +88,22 @@ func (a *App) auctionPriceBounds(item catalogItem) (int32, int32) {
 		highRand = lowRand
 	}
 	low, high := center*lowRand, center*highRand
-	if item.Kind == "equipment" {
-		low *= float64(cfg.Restock.EquipInflateMin)
-		high *= float64(cfg.Restock.EquipInflateMax)
+	category := valueCategory(item)
+	if category != valueCategoryEquipment {
+		if rule, ok := cfg.Restock.CategoryPriceRules[category]; ok {
+			low = math.Max(low, float64(rule.MinPrice))
+			high = math.Min(high, float64(rule.MaxPrice))
+		}
+	}
+	if category == valueCategoryEquipment {
+		low *= cfg.Restock.EquipmentMultiplierMin
+		high *= cfg.Restock.EquipmentMultiplierMax
 		if auctionEquipmentCanUpgrade(item) {
 			low *= auctionUpgradePriceFactor(cfg.Restock.UpgradeMin, cfg.Restock.UpgradePriceRate)
 			high *= auctionUpgradePriceFactor(cfg.Restock.UpgradeMax, cfg.Restock.UpgradePriceRate)
+		}
+		if max := float64(cfg.Restock.EquipmentFinalMaxPrice); max > 0 && high > max {
+			high = max
 		}
 	}
 	return boundedAuctionPrice(low), boundedAuctionPrice(high)

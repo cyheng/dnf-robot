@@ -26,7 +26,8 @@ func TestUpdateConfigKeepsIndependentActionLimits(t *testing.T) {
 	autoActions, restockActions, collectActions := 111, 222, 333
 	autoConcurrent, restockConcurrent, collectConcurrent := 7, 8, 9
 	qtyMin, qtyMax, delay := 3, 7, 25
-	categoryWeight, levelWeight := 0.4, 0.2
+	rules := clonePriceRules(app.cfg.Restock.CategoryPriceRules)
+	rules[valueCategoryMaterial] = PriceRule{MinPrice: 300, MaxPrice: 60000, RarityWeight: .4, LevelWeight: .2, PVFWeight: .4}
 	if _, err := app.UpdateConfig(ConfigUpdateRequest{
 		AutoMaxActions:         &autoActions,
 		RestockMaxActions:      &restockActions,
@@ -36,8 +37,7 @@ func TestUpdateConfigKeepsIndependentActionLimits(t *testing.T) {
 		CollectorMaxConcurrent: &collectConcurrent,
 		EquipmentQtyMin:        &qtyMin,
 		EquipmentQtyMax:        &qtyMax,
-		ValueCategoryWeight:    &categoryWeight,
-		ValueLevelWeight:       &levelWeight,
+		CategoryPriceRules:     rules,
 		StackSizes:             []int{100, 500},
 		BlockedItemIDs:         []uint32{300, 100, 300, 0},
 		AllowedItemIDs:         []uint32{400, 200, 400, 0},
@@ -54,8 +54,8 @@ func TestUpdateConfigKeepsIndependentActionLimits(t *testing.T) {
 	if app.cfg.Restock.EquipmentQtyMin != 3 || app.cfg.Restock.EquipmentQtyMax != 7 || app.cfg.Restock.PerItemDelayMS != 25 || len(app.cfg.Restock.StackSizes) != 2 {
 		t.Fatalf("restock web settings not applied: %+v", app.cfg.Restock)
 	}
-	if app.cfg.Restock.ValueCategoryWeight != 0.4 || app.cfg.Restock.ValueLevelWeight != 0.2 {
-		t.Fatalf("value weights not applied: %+v", app.cfg.Restock)
+	if app.cfg.Restock.CategoryPriceRules[valueCategoryMaterial].MinPrice != 300 {
+		t.Fatalf("category price rules not applied: %+v", app.cfg.Restock)
 	}
 	if got := app.cfg.Restock.BlockedItemIDs; len(got) != 2 || got[0] != 100 || got[1] != 300 {
 		t.Fatalf("blocked item IDs = %v, want [100 300]", got)
@@ -72,14 +72,14 @@ func TestApplyListingConfigLockedDoesNotChangeRuntimeParameters(t *testing.T) {
 	app.cfg.Restock.MaxConcurrent = 17
 	allowed, equipmentPolicy, materialPolicy := "056", tradePolicyStrict, tradePolicyPermissive
 	qty := 4
-	curveSpan, categoryWeight := 5.5, 0.5
-	basePrice := int32(2500)
-	recognition := map[string]float64{valueCategoryEquipment: 55, valueCategoryCard: 0}
+	rules := clonePriceRules(app.cfg.Restock.CategoryPriceRules)
+	rules[valueCategoryCard] = PriceRule{MinPrice: 2500, MaxPrice: 500000, RarityWeight: .5, LevelWeight: .2, PVFWeight: .3}
+	rules[valueCategoryEquipment] = PriceRule{MinPrice: 5000, MaxPrice: 10000000, RarityWeight: .4, LevelWeight: .3, PVFWeight: .3}
+	multiplierMin, multiplierMax := 1.25, 2.5
 	cfg, err := app.applyListingConfigLocked(ConfigUpdateRequest{
 		EquipmentAllowedRarities: &allowed, EquipmentTradePolicy: &equipmentPolicy, OtherTradePolicy: &materialPolicy,
 		EquipmentQtyMin: &qty, EquipmentQtyMax: &qty, BlockedItemIDs: []uint32{20, 10, 20},
-		ValueCurveSpan: &curveSpan, ValueBasePrice: &basePrice, ValueCategoryWeight: &categoryWeight,
-		ValueCategoryRecognition: recognition,
+		CategoryPriceRules: rules, EquipmentMultiplierMin: &multiplierMin, EquipmentMultiplierMax: &multiplierMax,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestApplyListingConfigLockedDoesNotChangeRuntimeParameters(t *testing.T) {
 	if cfg.Restock.EquipmentAllowedRarities != "056" || cfg.Restock.EquipmentTradePolicy != tradePolicyStrict || cfg.Restock.OtherTradePolicy != tradePolicyPermissive {
 		t.Fatalf("listing settings not applied: %+v", cfg.Restock)
 	}
-	if cfg.Restock.ValueCurveSpan != 5.5 || cfg.Restock.ValueBasePrice != 2500 || cfg.Restock.ValueCategoryWeight != 0.5 || cfg.Restock.ValueCategoryRecognition[valueCategoryEquipment] != 55 || cfg.Restock.ValueCategoryRecognition[valueCategoryCard] != 0 {
+	if cfg.Restock.CategoryPriceRules[valueCategoryCard].MinPrice != 2500 || cfg.Restock.CategoryPriceRules[valueCategoryEquipment].MaxPrice != 10000000 || cfg.Restock.EquipmentMultiplierMin != 1.25 || cfg.Restock.EquipmentMultiplierMax != 2.5 {
 		t.Fatalf("listing value model not applied: %+v", cfg.Restock)
 	}
 	if got := cfg.Restock.BlockedItemIDs; len(got) != 2 || got[0] != 10 || got[1] != 20 {

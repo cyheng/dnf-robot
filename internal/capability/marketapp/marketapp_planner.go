@@ -13,7 +13,7 @@ type normalAuctionPlan struct {
 	IsEquipment  bool
 	StackSize    int
 	TargetRecord int
-	BatchInflate float64
+	Multiplier   float64
 }
 
 func (a *App) planAuction(rows []restockRow, catalog map[uint32]catalogItem, have map[uint32]int, occ map[uint32]int, result *PlanResult) {
@@ -116,10 +116,13 @@ func (a *App) normalAuctionPlan(row restockRow, item catalogItem) normalAuctionP
 		IsEquipment:  isEquip,
 		StackSize:    stackSize,
 		TargetRecord: (row.Quantity + stackSize - 1) / stackSize,
-		BatchInflate: 1,
+		Multiplier:   1,
 	}
-	if isEquip {
-		plan.BatchInflate = float64(a.randomRange(cfg.Restock.EquipInflateMin, cfg.Restock.EquipInflateMax))
+	if valueCategory(item) == valueCategoryEquipment {
+		plan.Multiplier = cfg.Restock.EquipmentMultiplierMin
+		if high := cfg.Restock.EquipmentMultiplierMax; high > plan.Multiplier {
+			plan.Multiplier += a.randomFloat64() * (high - plan.Multiplier)
+		}
 	}
 	return plan
 }
@@ -166,7 +169,7 @@ func (a *App) appendNormalAuctionActions(plan normalAuctionPlan, occ map[uint32]
 				actionUpgrade = &upgrade
 			}
 		}
-		unit := a.auctionUnitPriceFor(plan.Item, plan.BatchInflate, upgrade)
+		unit := a.auctionUnitPriceFor(plan.Item, plan.Multiplier, upgrade)
 		total := unit
 		startPrice := unit - 1
 		if !plan.IsEquipment {
@@ -300,10 +303,9 @@ func (a *App) planSpecialAuction(row restockRow, item catalogItem, special strin
 	if records <= 0 {
 		records = 1
 	}
-	batchInflate := float64(a.randomRange(cfg.Restock.EquipInflateMin, cfg.Restock.EquipInflateMax))
 	planned := 0
 	for i := 0; i < records; i++ {
-		unit := a.auctionUnitPriceFor(item, batchInflate, 0)
+		unit := a.auctionUnitPriceFor(item, 1, 0)
 		ownerID := a.pickOwner(occ)
 		action := Action{
 			Market:       marketNameAuction,

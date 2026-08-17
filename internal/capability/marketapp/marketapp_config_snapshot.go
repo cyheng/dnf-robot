@@ -2,6 +2,14 @@ package marketapp
 
 import "time"
 
+func clonePriceRules(values map[string]PriceRule) map[string]PriceRule {
+	out := make(map[string]PriceRule, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
 // Config values published on App are immutable. Writers replace the complete
 // snapshot; readers copy only the struct header while holding stateMu, so they
 // do not retain the lock while using slices and pointers.
@@ -41,10 +49,10 @@ func cloneConfig(cfg Config) Config {
 	out.Restock.BlockedItemIDs = append([]uint32(nil), cfg.Restock.BlockedItemIDs...)
 	out.Restock.AllowedItemIDs = append([]uint32(nil), cfg.Restock.AllowedItemIDs...)
 	out.Restock.StackSizes = append([]int(nil), cfg.Restock.StackSizes...)
-	if cfg.Restock.ValueCategoryRecognition != nil {
-		out.Restock.ValueCategoryRecognition = make(map[string]float64, len(cfg.Restock.ValueCategoryRecognition))
-		for key, value := range cfg.Restock.ValueCategoryRecognition {
-			out.Restock.ValueCategoryRecognition[key] = value
+	if cfg.Restock.CategoryPriceRules != nil {
+		out.Restock.CategoryPriceRules = make(map[string]PriceRule, len(cfg.Restock.CategoryPriceRules))
+		for key, value := range cfg.Restock.CategoryPriceRules {
+			out.Restock.CategoryPriceRules[key] = value
 		}
 	}
 	out.Cera.Comments = cloneStringMap(cfg.Cera.Comments)

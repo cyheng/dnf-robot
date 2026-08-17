@@ -1,10 +1,7 @@
 package marketapp
 
 import (
-	"fmt"
 	"math"
-	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -18,72 +15,44 @@ const (
 	valueCategoryRecipe     = "recipe"
 	valueCategoryMaterial   = "material"
 	valueCategoryConsumable = "consumable"
+	valueCategoryPuppet     = "puppet"
 	valueCategoryOther      = "other"
 )
 
-func defaultValueCategoryRecognition() map[string]float64 {
-	return map[string]float64{
-		valueCategoryEquipment: 45, valueCategoryTitle: 95, valueCategoryCard: 85,
-		valueCategoryCreature: 100, valueCategoryArtifact: 90, valueCategoryBead: 80,
-		valueCategoryRecipe: 40, valueCategoryMaterial: 10, valueCategoryConsumable: 20,
-		valueCategoryOther: 20,
+func categoryPriceRuleKeys() []string {
+	return []string{
+		valueCategoryEquipment, valueCategoryTitle, valueCategoryCard, valueCategoryCreature, valueCategoryArtifact,
+		valueCategoryBead, valueCategoryRecipe, valueCategoryMaterial, valueCategoryConsumable,
+		valueCategoryPuppet, valueCategoryOther,
 	}
 }
 
-func validValueCategory(value string) bool {
-	switch value {
-	case valueCategoryEquipment, valueCategoryTitle, valueCategoryCard, valueCategoryCreature,
-		valueCategoryArtifact, valueCategoryBead, valueCategoryRecipe, valueCategoryMaterial,
-		valueCategoryConsumable, valueCategoryOther:
-		return true
-	default:
-		return false
-	}
-}
-
-func mergeValueCategoryRecognition(current, updates map[string]float64) map[string]float64 {
-	result := make(map[string]float64, len(current)+len(updates))
-	for key, value := range current {
-		result[key] = value
-	}
-	for key, value := range updates {
-		result[strings.ToLower(strings.TrimSpace(key))] = value
-	}
-	return result
-}
-
-func encodeValueCategoryRecognition(values map[string]float64) string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	parts := make([]string, 0, len(keys))
-	for _, key := range keys {
-		parts = append(parts, key+"|"+formatFloat(values[key]))
-	}
-	return strings.Join(parts, ";")
-}
-
-func decodeValueCategoryRecognition(value string) (map[string]float64, error) {
-	result := defaultValueCategoryRecognition()
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return result, nil
-	}
-	for _, entry := range strings.Split(value, ";") {
-		parts := strings.SplitN(strings.TrimSpace(entry), "|", 2)
-		key := strings.ToLower(strings.TrimSpace(parts[0]))
-		if len(parts) != 2 || !validValueCategory(key) {
-			return nil, fmt.Errorf("invalid value category recognition %q", entry)
+func validCategoryPriceRule(value string) bool {
+	for _, key := range categoryPriceRuleKeys() {
+		if value == key {
+			return true
 		}
-		score, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-		if err != nil || score < 0 || score > 100 {
-			return nil, fmt.Errorf("invalid value category score %q", entry)
-		}
-		result[key] = score
 	}
-	return result, nil
+	return false
+}
+
+func defaultCategoryPriceRules() map[string]PriceRule {
+	rule := func(min, max int32, rarity, level, pvf float64) PriceRule {
+		return PriceRule{MinPrice: min, MaxPrice: max, RarityWeight: rarity, LevelWeight: level, PVFWeight: pvf}
+	}
+	return map[string]PriceRule{
+		valueCategoryEquipment:  rule(10000, 50000000, .4, .35, .25),
+		valueCategoryTitle:      rule(100000, 10000000, .4, .2, .4),
+		valueCategoryCard:       rule(20000, 20000000, .4, .2, .4),
+		valueCategoryCreature:   rule(100000, 20000000, .4, .2, .4),
+		valueCategoryArtifact:   rule(10000, 5000000, .4, .2, .4),
+		valueCategoryBead:       rule(10000, 5000000, .4, .2, .4),
+		valueCategoryRecipe:     rule(1000, 500000, .4, .2, .4),
+		valueCategoryMaterial:   rule(100, 50000, .4, .2, .4),
+		valueCategoryConsumable: rule(200, 30000, .4, .2, .4),
+		valueCategoryPuppet:     rule(5000, 200000, .4, .2, .4),
+		valueCategoryOther:      rule(100, 100000, .4, .2, .4),
+	}
 }
 
 func valueCategory(item catalogItem) string {
@@ -100,13 +69,27 @@ func valueCategory(item catalogItem) string {
 	path := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(item.Path), "\\", "/"))
 	slot := strings.ToLower(strings.TrimSpace(item.Slot))
 	switch {
-	case strings.HasPrefix(path, "stackable/monstercard/") || strings.Contains(slot, "material expert job"):
-		return valueCategoryCard
-	case strings.HasPrefix(path, "stackable/professional/bead/") || strings.Contains(slot, "enchant waste"):
+	case strings.HasPrefix(path, "stackable/professional/potion/"):
+		return valueCategoryConsumable
+	case strings.HasPrefix(path, "stackable/professional/puppet/") || strings.HasPrefix(path, "stackable/professional/common/") && strings.Contains(path, "doll"):
+		return valueCategoryPuppet
+	case strings.HasPrefix(path, "stackable/professional/material/"):
+		return valueCategoryMaterial
+	case strings.HasPrefix(path, "stackable/professional/bead/"):
 		return valueCategoryBead
-	case strings.HasPrefix(path, "stackable/recipe/") || strings.Contains(slot, "recipe"):
+	case strings.HasPrefix(path, "stackable/monstercard/"):
+		return valueCategoryCard
+	case strings.HasPrefix(path, "stackable/recipe/"):
 		return valueCategoryRecipe
-	case strings.HasPrefix(path, "stackable/material/") || strings.Contains(slot, "material"):
+	case strings.HasPrefix(path, "stackable/material/"):
+		return valueCategoryMaterial
+	case strings.Contains(slot, "enchant waste"):
+		return valueCategoryBead
+	case strings.Contains(slot, "recipe"):
+		return valueCategoryRecipe
+	case strings.Contains(slot, "material expert job"):
+		return valueCategoryCard
+	case strings.Contains(slot, "material"):
 		return valueCategoryMaterial
 	case strings.HasPrefix(path, "stackable/professional/") || strings.Contains(slot, "potion") || strings.Contains(slot, "consum"):
 		return valueCategoryConsumable
@@ -115,95 +98,40 @@ func valueCategory(item catalogItem) string {
 	}
 }
 
-type valueScoreDetail struct {
-	Category      string  `json:"category"`
-	Score         float64 `json:"score"`
-	CategoryScore float64 `json:"category_score"`
-	RarityScore   float64 `json:"rarity_score"`
-	LevelScore    float64 `json:"level_score"`
-	PVFScore      float64 `json:"pvf_score"`
-}
-
-func (a *App) valueScore(item catalogItem) valueScoreDetail {
-	return valueScoreWithConfig(item, a.configSnapshot().Restock)
-}
-
-func valueScoreWithConfig(item catalogItem, cfg RestockCfg) valueScoreDetail {
-	category := valueCategory(item)
-	recognition, ok := cfg.ValueCategoryRecognition[category]
-	if !ok {
-		recognition, ok = cfg.ValueCategoryRecognition[valueCategoryOther]
-	}
-	if !ok {
-		recognition = 20
-	}
-	rarity := float64(item.Rarity)
-	if rarity < 0 {
-		rarity = 0
-	}
-	if rarity > 5 {
-		rarity = 5
-	}
-	level := float64(item.Level)
-	if level < 0 {
-		level = 0
-	}
-	if level > 70 {
-		level = 70
-	}
+func priceRuleScore(item catalogItem, rule PriceRule) float64 {
+	rarity := math.Max(0, math.Min(5, float64(item.Rarity))) / 5
+	level := math.Max(0, math.Min(70, float64(item.Level))) / 70
 	raw := item.Price
 	if raw <= 10 {
 		raw = item.Value
 	}
-	pvfScore := 0.0
+	pvf, pvfWeight := 0.0, math.Max(0, rule.PVFWeight)
 	if raw > 10 {
-		pvfScore = math.Log10(float64(raw)) / 6
-		if pvfScore > 1 {
-			pvfScore = 1
-		}
+		pvf = math.Min(1, math.Log10(float64(raw))/6)
+	} else {
+		pvfWeight = 0
 	}
-	wc, wr, wl, wp := cfg.ValueCategoryWeight, cfg.ValueRarityWeight, cfg.ValueLevelWeight, cfg.ValuePVFWeight
-	if wc < 0 {
-		wc = 0
+	rarityWeight := math.Max(0, rule.RarityWeight)
+	levelWeight := math.Max(0, rule.LevelWeight)
+	total := rarityWeight + levelWeight + pvfWeight
+	if total <= 0 {
+		return 0
 	}
-	if wr < 0 {
-		wr = 0
-	}
-	if wl < 0 {
-		wl = 0
-	}
-	if wp < 0 {
-		wp = 0
-	}
-	totalWeight := wc + wr + wl + wp
-	if totalWeight <= 0 {
-		return valueScoreDetail{Category: category, CategoryScore: recognition, RarityScore: rarity / 5, LevelScore: level / 70, PVFScore: pvfScore}
-	}
-	score := (wc*(recognition/100) + wr*(rarity/5) + wl*(level/70) + wp*pvfScore) / totalWeight
-	if score < 0 {
-		score = 0
-	}
-	if score > 1 {
-		score = 1
-	}
-	return valueScoreDetail{Category: category, Score: score, CategoryScore: recognition, RarityScore: rarity / 5, LevelScore: level / 70, PVFScore: pvfScore}
+	return (rarity*rarityWeight + level*levelWeight + pvf*pvfWeight) / total
 }
 
-func (a *App) valueModelCenterPrice(item catalogItem) float64 {
-	return valueModelCenterPriceWithConfig(item, a.configSnapshot().Restock)
+func priceFromRule(item catalogItem, rule PriceRule) float64 {
+	low, high := float64(rule.MinPrice), float64(rule.MaxPrice)
+	if high <= low {
+		return math.Max(1, low)
+	}
+	return low * math.Pow(high/low, priceRuleScore(item, rule))
 }
 
-func valueModelCenterPriceWithConfig(item catalogItem, cfg RestockCfg) float64 {
-	base := float64(cfg.ValueBasePrice)
-	if base <= 0 {
-		base = 1000
+func configuredCenterPrice(item catalogItem, cfg RestockCfg) float64 {
+	category := valueCategory(item)
+	if rule, ok := cfg.CategoryPriceRules[category]; ok {
+		return priceFromRule(item, rule)
 	}
-	span := cfg.ValueCurveSpan
-	if span <= 0 {
-		span = 6
-	}
-	if span > 12 {
-		span = 12
-	}
-	return base * math.Pow(10, valueScoreWithConfig(item, cfg).Score*span)
+	return priceFromRule(item, cfg.CategoryPriceRules[valueCategoryOther])
 }

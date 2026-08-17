@@ -12,7 +12,6 @@ const (
 	marketConfigMaxQuantity      = 10_000
 	marketConfigMaxLevel         = 999
 	marketConfigMaxUpgrade       = 31
-	marketConfigMaxInflate       = 1_000
 	marketConfigMaxRate          = 10
 	marketConfigMaxRand          = 100
 	marketConfigMaxDelayMS       = 60_000
@@ -111,9 +110,6 @@ func validateMarketConfig(cfg Config) error {
 	if r.EquipmentLevelMin < 0 || r.EquipmentLevelMin > marketConfigMaxLevel || r.EquipmentLevelMax < 0 || r.EquipmentLevelMax > marketConfigMaxLevel || r.EquipmentLevelMax > 0 && r.EquipmentLevelMax < r.EquipmentLevelMin {
 		return fmt.Errorf("auction_price equipment levels must satisfy 0 <= min <= max (0 max means unlimited)")
 	}
-	if r.EquipInflateMin <= 0 || r.EquipInflateMin > marketConfigMaxInflate || r.EquipInflateMax < r.EquipInflateMin || r.EquipInflateMax > marketConfigMaxInflate {
-		return fmt.Errorf("auction_price equipment multipliers must satisfy 1 <= min <= max <= %d", marketConfigMaxInflate)
-	}
 	if r.UpgradeMin < 0 || r.UpgradeMin > marketConfigMaxUpgrade || r.UpgradeMax < r.UpgradeMin || r.UpgradeMax > marketConfigMaxUpgrade {
 		return fmt.Errorf("auction_price upgrades must satisfy 0 <= min <= max <= %d", marketConfigMaxUpgrade)
 	}
@@ -123,24 +119,28 @@ func validateMarketConfig(cfg Config) error {
 	if !finiteInRange(r.RandLow, 0, marketConfigMaxRand) || r.RandLow <= 0 || !finiteInRange(r.RandHigh, 0, marketConfigMaxRand) || r.RandHigh < r.RandLow {
 		return fmt.Errorf("auction_price random multipliers must be finite, positive, and satisfy low <= high")
 	}
-	for key, value := range map[string]float64{
-		"value_category_weight": r.ValueCategoryWeight, "value_rarity_weight": r.ValueRarityWeight,
-		"value_level_weight": r.ValueLevelWeight, "value_pvf_weight": r.ValuePVFWeight,
-	} {
-		if !finiteInRange(value, 0, 1) {
-			return fmt.Errorf("auction_price.%s must be finite and in 0..1", key)
+	if !finiteInRange(r.EquipmentMultiplierMin, 0, marketConfigMaxRand) || r.EquipmentMultiplierMin <= 0 || !finiteInRange(r.EquipmentMultiplierMax, 0, marketConfigMaxRand) || r.EquipmentMultiplierMax < r.EquipmentMultiplierMin {
+		return fmt.Errorf("auction_price equipment multipliers must be finite, positive, and satisfy min <= max")
+	}
+	if len(r.CategoryPriceRules) != len(categoryPriceRuleKeys()) {
+		return fmt.Errorf("auction_price.category_price_rules must define every category")
+	}
+	for _, category := range categoryPriceRuleKeys() {
+		rule, ok := r.CategoryPriceRules[category]
+		if !ok {
+			return fmt.Errorf("auction_price.category_price_rules is missing %q", category)
+		}
+		if err := validatePriceRule("category_price_rules."+category, rule); err != nil {
+			return err
 		}
 	}
-	if !finiteInRange(r.ValueCurveSpan, 1, 12) {
-		return fmt.Errorf("auction_price.value_curve_span must be finite and in 1..12")
-	}
-	if r.ValueBasePrice <= 0 {
-		return fmt.Errorf("auction_price.value_base_price must be positive")
-	}
-	for key, value := range r.ValueCategoryRecognition {
-		if !validValueCategory(key) || !finiteInRange(value, 0, 100) {
-			return fmt.Errorf("auction_price.value_category_recognition contains invalid %q", key)
+	for category := range r.CategoryPriceRules {
+		if !validCategoryPriceRule(category) {
+			return fmt.Errorf("auction_price.category_price_rules contains unknown category %q", category)
 		}
+	}
+	if r.EquipmentFinalMaxPrice < r.CategoryPriceRules[valueCategoryEquipment].MaxPrice {
+		return fmt.Errorf("auction_price.equipment_final_max_price must be at least the equipment base maximum")
 	}
 	if err := validateMarketLimits("auction_price", r.MaxActions, r.MaxConcurrent); err != nil {
 		return err
@@ -176,6 +176,24 @@ func validateMarketConfig(cfg Config) error {
 	}
 	if err := validateMarketLimits("auto", cfg.Auto.MaxActions, cfg.Auto.MaxConcurrent); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validatePriceRule(name string, rule PriceRule) error {
+	if rule.MinPrice <= 0 || rule.MaxPrice < rule.MinPrice {
+		return fmt.Errorf("auction_price.%s prices must satisfy 1 <= min_price <= max_price", name)
+	}
+	weights := []float64{rule.RarityWeight, rule.LevelWeight, rule.PVFWeight}
+	total := 0.0
+	for _, weight := range weights {
+		if !finiteInRange(weight, 0, 100) {
+			return fmt.Errorf("auction_price.%s weights must be finite and non-negative", name)
+		}
+		total += weight
+	}
+	if total <= 0 {
+		return fmt.Errorf("auction_price.%s must have at least one positive weight", name)
 	}
 	return nil
 }

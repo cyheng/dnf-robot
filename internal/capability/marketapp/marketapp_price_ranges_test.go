@@ -20,20 +20,18 @@ func TestCustomPriceRangeOverridesFullEquipmentFormula(t *testing.T) {
 	}
 }
 
-func TestEquipmentFormulaBoundsIncludeMultiplierUpgradeAndRandomRate(t *testing.T) {
+func TestEquipmentFormulaBoundsIncludeUpgradeAndRandomRate(t *testing.T) {
 	app := testApp(t)
 	app.cfg.Restock.RandLow = 0.9
 	app.cfg.Restock.RandHigh = 1.1
-	app.cfg.Restock.EquipInflateMin = 5
-	app.cfg.Restock.EquipInflateMax = 8
 	app.cfg.Restock.UpgradeMin = 7
 	app.cfg.Restock.UpgradeMax = 13
 	app.cfg.Restock.UpgradePriceRate = 0.08
 	setFixedValueModelBase(&app.cfg.Restock, valueCategoryEquipment, 1000)
 
 	low, high := app.auctionPriceBounds(catalogItem{ItemID: 31056, Kind: "equipment", Slot: "weapon", Price: 1000})
-	if low != 7020 || high != 24287 {
-		t.Fatalf("formula bounds=%d..%d want 7020..24287", low, high)
+	if low != 1404 || high != 6071 {
+		t.Fatalf("formula bounds=%d..%d want 1404..6071", low, high)
 	}
 }
 
@@ -55,31 +53,39 @@ func TestUpgradePriceFactorIsLinearThroughTenAndAddsRiskPremiumAboveTen(t *testi
 	}
 }
 
+func TestEquipmentMultiplierAppliesOnlyToEquipment(t *testing.T) {
+	app := testApp(t)
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryEquipment, 1000)
+	setFixedValueModelBase(&app.cfg.Restock, valueCategoryOther, 1000)
+	app.cfg.Restock.UpgradePriceRate = 0
+	app.cfg.Restock.RandLow, app.cfg.Restock.RandHigh = 1, 1
+	if got := app.auctionUnitPriceFor(catalogItem{Kind: "equipment"}, 1.5, 0); got != 1500 {
+		t.Fatalf("equipment multiplier price=%d want 1500", got)
+	}
+	if got := app.auctionUnitPriceFor(catalogItem{Kind: "stackable"}, 9, 0); got != 1000 {
+		t.Fatalf("stackable used equipment multiplier: price=%d want 1000", got)
+	}
+}
+
 func TestEquipmentFormulaBoundsExcludeUpgradeForUnsupportedSlot(t *testing.T) {
 	app := testApp(t)
 	app.cfg.Restock.RandLow = 1
 	app.cfg.Restock.RandHigh = 1
-	app.cfg.Restock.EquipInflateMin = 1
-	app.cfg.Restock.EquipInflateMax = 1
 	app.cfg.Restock.UpgradeMin = 13
 	app.cfg.Restock.UpgradeMax = 13
 	app.cfg.Restock.UpgradePriceRate = 0.08
 	setFixedValueModelBase(&app.cfg.Restock, valueCategoryEquipment, 1000)
 
 	low, high := app.auctionPriceBounds(catalogItem{Kind: "equipment", Slot: "unknown", Price: 1000})
-	if low != 1000 || high != 1000 {
-		t.Fatalf("unsupported slot bounds=%d..%d want 1000..1000", low, high)
+	if low != 1000 || high != 2000 {
+		t.Fatalf("unsupported slot bounds=%d..%d want 1000..2000", low, high)
 	}
 }
 
 func TestValueModelAppliesToEquipmentAndStackableItems(t *testing.T) {
 	app := testApp(t)
-	app.cfg.Restock.ValueCategoryWeight = 0
-	app.cfg.Restock.ValueRarityWeight = 1
-	app.cfg.Restock.ValueLevelWeight = 0
-	app.cfg.Restock.ValuePVFWeight = 0
-	app.cfg.Restock.ValueCurveSpan = 2
-	app.cfg.Restock.ValueBasePrice = 1000
+	app.cfg.Restock.CategoryPriceRules[valueCategoryEquipment] = PriceRule{MinPrice: 1000, MaxPrice: 100000, RarityWeight: 1}
+	app.cfg.Restock.CategoryPriceRules[valueCategoryOther] = PriceRule{MinPrice: 1000, MaxPrice: 100000, RarityWeight: 1}
 	app.cfg.Restock.UpgradePriceRate = 0
 	app.cfg.Restock.RandLow = 1
 	app.cfg.Restock.RandHigh = 1
@@ -97,8 +103,6 @@ func TestValueModelAppliesToEquipmentAndStackableItems(t *testing.T) {
 func TestValueModelIsIncludedInCollectorBounds(t *testing.T) {
 	app := testApp(t)
 	setFixedValueModelBase(&app.cfg.Restock, valueCategoryEquipment, 1000)
-	app.cfg.Restock.EquipInflateMin = 1
-	app.cfg.Restock.EquipInflateMax = 2
 	app.cfg.Restock.UpgradeMin = 0
 	app.cfg.Restock.UpgradeMax = 0
 	app.cfg.Restock.RandLow = 1
@@ -152,11 +156,11 @@ func TestInvalidCustomPriceFileFallsBackToFormula(t *testing.T) {
 }
 
 func setFixedValueModelBase(cfg *RestockCfg, category string, base int32) {
-	cfg.ValueCategoryWeight = 1
-	cfg.ValueRarityWeight = 0
-	cfg.ValueLevelWeight = 0
-	cfg.ValuePVFWeight = 0
-	cfg.ValueCurveSpan = 6
-	cfg.ValueBasePrice = base
-	cfg.ValueCategoryRecognition[category] = 0
+	rule := PriceRule{MinPrice: base, MaxPrice: base, RarityWeight: 1}
+	if category == valueCategoryEquipment {
+		cfg.CategoryPriceRules[category] = rule
+		cfg.EquipmentFinalMaxPrice = maxInt32
+		return
+	}
+	cfg.CategoryPriceRules[category] = rule
 }

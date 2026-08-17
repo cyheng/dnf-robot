@@ -2,7 +2,7 @@ package marketapp
 
 import "testing"
 
-func TestValueCategoryUsesEconomicGroups(t *testing.T) {
+func TestValueCategoryUsesPathBeforeSlotFallback(t *testing.T) {
 	cases := []struct {
 		name string
 		item catalogItem
@@ -12,7 +12,9 @@ func TestValueCategoryUsesEconomicGroups(t *testing.T) {
 		{"card", catalogItem{Kind: "stackable", Path: "stackable/monstercard/example.stk"}, valueCategoryCard},
 		{"bead", catalogItem{Kind: "stackable", Path: "stackable/professional/bead/example.stk"}, valueCategoryBead},
 		{"recipe", catalogItem{Kind: "stackable", Path: "stackable/recipe/example.stk"}, valueCategoryRecipe},
-		{"material", catalogItem{Kind: "stackable", Path: "stackable/material/example.stk", Slot: "material"}, valueCategoryMaterial},
+		{"material", catalogItem{Kind: "stackable", Path: "stackable/professional/material/example.stk", Slot: "material expert job"}, valueCategoryMaterial},
+		{"potion", catalogItem{Kind: "stackable", Path: "stackable/professional/potion/example.stk", Slot: "material expert job"}, valueCategoryConsumable},
+		{"puppet", catalogItem{Kind: "stackable", Path: "stackable/professional/puppet/example.stk"}, valueCategoryPuppet},
 		{"equipment", catalogItem{Kind: "equipment", ItemType: 1, Slot: "weapon"}, valueCategoryEquipment},
 	}
 	for _, tt := range cases {
@@ -22,84 +24,46 @@ func TestValueCategoryUsesEconomicGroups(t *testing.T) {
 	}
 }
 
-func TestDefaultValueModelUsesTunedVMDistribution(t *testing.T) {
+func TestDefaultCategoryPriceRulesAreComplete(t *testing.T) {
 	cfg := DefaultConfig().Restock
-	if cfg.ValueCategoryWeight != .45 || cfg.ValueRarityWeight != .25 || cfg.ValueLevelWeight != .20 || cfg.ValuePVFWeight != .10 {
-		t.Fatalf("unexpected default value weights: %+v", cfg)
+	if len(cfg.CategoryPriceRules) != len(categoryPriceRuleKeys()) {
+		t.Fatalf("category rules=%d want %d", len(cfg.CategoryPriceRules), len(categoryPriceRuleKeys()))
 	}
-	if cfg.ValueCurveSpan != 6 || cfg.ValueBasePrice != 1000 {
-		t.Fatalf("unexpected default value curve: %+v", cfg)
+	potion := cfg.CategoryPriceRules[valueCategoryConsumable]
+	if potion.MinPrice != 200 || potion.MaxPrice != 30000 {
+		t.Fatalf("potion range=%+v", potion)
 	}
-}
-
-func TestValueScoreTreatsTinyPVFPricesAsMissingSignal(t *testing.T) {
-	app := testApp(t)
-	app.cfg.Restock.ValueCategoryRecognition = defaultValueCategoryRecognition()
-	app.cfg.Restock.ValueCategoryWeight = .5
-	app.cfg.Restock.ValueRarityWeight = .25
-	app.cfg.Restock.ValueLevelWeight = .15
-	app.cfg.Restock.ValuePVFWeight = .1
-	low := app.valueScore(catalogItem{Kind: "stackable", Path: "stackable/monstercard/a.stk", Price: 1, Rarity: 3})
-	high := app.valueScore(catalogItem{Kind: "stackable", Path: "stackable/monstercard/a.stk", Price: 100000, Rarity: 3})
-	if low.Score >= high.Score {
-		t.Fatalf("valid PVF signal should increase score: low=%+v high=%+v", low, high)
-	}
-	if low.PVFScore != 0 {
-		t.Fatalf("tiny PVF price should be ignored, got %v", low.PVFScore)
+	if rule := cfg.CategoryPriceRules[valueCategoryEquipment]; rule.MinPrice != 10000 || rule.MaxPrice != 50000000 {
+		t.Fatalf("equipment range=%+v", rule)
 	}
 }
 
-func TestValueScoreUsesPVFValueWhenPriceIsTiny(t *testing.T) {
-	app := testApp(t)
-	detail := app.valueScore(catalogItem{Kind: "stackable", Price: 1, Value: 100000})
-	if detail.PVFScore <= 0 {
-		t.Fatalf("PVF value should replace a tiny price signal: %+v", detail)
+func TestPriceRuleReweightsWhenPVFValueIsMissing(t *testing.T) {
+	rule := PriceRule{MinPrice: 100, MaxPrice: 100000, RarityWeight: .4, LevelWeight: .2, PVFWeight: .4}
+	withoutPVF := priceRuleScore(catalogItem{Rarity: 5, Level: 70, Price: 1}, rule)
+	withPVF := priceRuleScore(catalogItem{Rarity: 5, Level: 70, Price: 1000000}, rule)
+	if withoutPVF != 1 || withPVF != 1 {
+		t.Fatalf("missing signal was not reweighted: without=%v with=%v", withoutPVF, withPVF)
 	}
 }
 
-func TestValueScorePreservesZeroCategoryRecognition(t *testing.T) {
-	app := testApp(t)
-	app.cfg.Restock.ValueCategoryRecognition[valueCategoryCard] = 0
-	detail := app.valueScore(catalogItem{Kind: "stackable", Path: "stackable/monstercard/a.stk"})
-	if detail.CategoryScore != 0 {
-		t.Fatalf("explicit zero category recognition was replaced: %+v", detail)
-	}
-}
-
-func TestDecodeValueCategoryRecognitionRejectsUnknownCategory(t *testing.T) {
-	if _, err := decodeValueCategoryRecognition("unknown|50"); err == nil {
-		t.Fatal("unknown value category was accepted")
-	}
-}
-
-func TestZeroValueWeightsProduceBasePrice(t *testing.T) {
+func TestCategoryPriceStaysInsideConfiguredRange(t *testing.T) {
 	cfg := DefaultConfig().Restock
-	cfg.ValueCategoryWeight, cfg.ValueRarityWeight, cfg.ValueLevelWeight, cfg.ValuePVFWeight = 0, 0, 0, 0
-	if got := valueModelCenterPriceWithConfig(catalogItem{Kind: "equipment", Level: 70, Rarity: 5, Price: 1000000}, cfg); got != float64(cfg.ValueBasePrice) {
-		t.Fatalf("zero weights price=%v want base %d", got, cfg.ValueBasePrice)
+	for _, category := range categoryPriceRuleKeys() {
+		rule := cfg.CategoryPriceRules[category]
+		low := priceFromRule(catalogItem{}, rule)
+		high := priceFromRule(catalogItem{Level: 70, Rarity: 5, Price: 1000000}, rule)
+		if low < float64(rule.MinPrice) || high > float64(rule.MaxPrice) || high < low {
+			t.Fatalf("%s prices=%v..%v rule=%+v", category, low, high, rule)
+		}
 	}
 }
 
-func TestValueModelPriceIsMonotonic(t *testing.T) {
-	app := testApp(t)
-	app.cfg.Restock.ValueCategoryRecognition = defaultValueCategoryRecognition()
-	app.cfg.Restock.ValueCurveSpan = 6
-	low := app.valueModelCenterPrice(catalogItem{Kind: "stackable", Path: "stackable/monstercard/a.stk", Rarity: 0})
-	high := app.valueModelCenterPrice(catalogItem{Kind: "stackable", Path: "stackable/monstercard/a.stk", Rarity: 5})
+func TestCategoryPriceIsMonotonicWithinRange(t *testing.T) {
+	rule := defaultCategoryPriceRules()[valueCategoryCard]
+	low := priceFromRule(catalogItem{Rarity: 0}, rule)
+	high := priceFromRule(catalogItem{Rarity: 5, Level: 70, Price: 1000000}, rule)
 	if low <= 0 || high <= low {
-		t.Fatalf("value curve is not monotonic: low=%v high=%v", low, high)
-	}
-}
-
-func TestAuctionPlanPricingKeepsFullCatalogSignals(t *testing.T) {
-	app := testApp(t)
-	item := catalogItem{
-		ItemID: 77, Kind: "stackable", Path: "stackable/monstercard/a.stk",
-		Price: 1, Value: 100000, Rarity: 3,
-	}
-	_, planned := auctionPlanRow(restockRow{ItemID: 77, Kind: "stackable", SystemPrice: 1}, map[uint32]catalogItem{77: item})
-	detail := app.valueScore(planned)
-	if detail.Category != valueCategoryCard || detail.PVFScore <= 0 || planned.Value != 100000 {
-		t.Fatalf("catalog pricing signals were lost: item=%+v score=%+v", planned, detail)
+		t.Fatalf("category curve is not monotonic: low=%v high=%v", low, high)
 	}
 }

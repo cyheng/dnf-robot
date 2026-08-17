@@ -31,7 +31,7 @@ func TestLoadConfigCreatesCommentedINIInConfDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "[auction_price]") || !strings.Contains(text, "# 装备基础价格的最小随机倍率。") {
+	if !strings.Contains(text, "[auction_price]") || !strings.Contains(text, "category_price_rules = ") {
 		t.Fatalf("generated INI lacks documented pricing configuration:\n%s", text)
 	}
 	if !strings.Contains(text, "equipment_allowed_rarities = 012345") || !strings.Contains(text, "other_allowed_rarities = 012345") || !strings.Contains(text, "equipment_trade_policy = permissive") || !strings.Contains(text, "other_trade_policy = permissive") {
@@ -43,7 +43,7 @@ func TestLoadConfigCreatesCommentedINIInConfDirectory(t *testing.T) {
 	if !strings.Contains(text, "allowed_item_ids = ") {
 		t.Fatalf("generated INI lacks allowed item IDs setting:\n%s", text)
 	}
-	for _, recommended := range []string{"equip_inflate_min = 1", "equip_inflate_max = 2", "value_category_weight = 0.45", "value_rarity_weight = 0.25", "value_level_weight = 0.2", "value_pvf_weight = 0.1", "value_curve_span = 6", "value_base_price = 1000"} {
+	for _, recommended := range []string{"category_price_rules = ", "equipment_multiplier_min = 1", "equipment_multiplier_max = 2", "equipment_final_max_price = 200000000"} {
 		if !strings.Contains(text, recommended) {
 			t.Fatalf("generated INI lacks recommended pricing setting %q:\n%s", recommended, text)
 		}
@@ -109,13 +109,8 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Restock.BlockedItemIDs = []uint32{100, 300}
 	cfg.Restock.AllowedItemIDs = []uint32{200, 400}
-	cfg.Restock.ValueCurveSpan = 4.5
-	cfg.Restock.ValueBasePrice = 2500
-	cfg.Restock.ValueCategoryWeight = .4
-	cfg.Restock.ValueRarityWeight = .3
-	cfg.Restock.ValueLevelWeight = .2
-	cfg.Restock.ValuePVFWeight = .1
-	cfg.Restock.ValueCategoryRecognition[valueCategoryBead] = 73
+	cfg.Restock.CategoryPriceRules[valueCategoryBead] = PriceRule{MinPrice: 2500, MaxPrice: 90000, RarityWeight: .3, LevelWeight: .2, PVFWeight: .5}
+	cfg.Restock.CategoryPriceRules[valueCategoryEquipment] = PriceRule{MinPrice: 5000, MaxPrice: 9000000, RarityWeight: .4, LevelWeight: .3, PVFWeight: .3}
 	if err := writeMarketConfig(path, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -129,18 +124,18 @@ func TestMarketConfigRoundTripsBlockedItemIDs(t *testing.T) {
 	if got := loaded.Restock.AllowedItemIDs; len(got) != 2 || got[0] != 200 || got[1] != 400 {
 		t.Fatalf("allowed item IDs = %v, want [200 400]", got)
 	}
-	if loaded.Restock.ValueCurveSpan != 4.5 || loaded.Restock.ValueBasePrice != 2500 || loaded.Restock.ValueCategoryWeight != .4 || loaded.Restock.ValueRarityWeight != .3 || loaded.Restock.ValueLevelWeight != .2 || loaded.Restock.ValuePVFWeight != .1 {
-		t.Fatalf("value model settings did not round trip: %+v", loaded.Restock)
+	if got := loaded.Restock.CategoryPriceRules[valueCategoryBead]; got.MinPrice != 2500 || got.MaxPrice != 90000 || got.PVFWeight != .5 {
+		t.Fatalf("bead price rule did not round trip: %+v", got)
 	}
-	if got := loaded.Restock.ValueCategoryRecognition[valueCategoryBead]; got != 73 {
-		t.Fatalf("bead recognition = %v, want 73", got)
+	if got := loaded.Restock.CategoryPriceRules[valueCategoryEquipment]; got.MinPrice != 5000 || got.MaxPrice != 9000000 || got.LevelWeight != .3 {
+		t.Fatalf("equipment price rule did not round trip: %+v", got)
 	}
 }
 
-func TestMarketConfigRejectsUnknownValueCategory(t *testing.T) {
+func TestMarketConfigRejectsUnknownPriceCategory(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Restock.ValueCategoryRecognition["unknown"] = 50
-	if err := validateMarketConfig(cfg); err == nil || !strings.Contains(err.Error(), "value_category_recognition") {
+	cfg.Restock.CategoryPriceRules["unknown"] = PriceRule{MinPrice: 1, MaxPrice: 2, RarityWeight: 1}
+	if err := validateMarketConfig(cfg); err == nil || !strings.Contains(err.Error(), "category_price_rules") {
 		t.Fatalf("unknown value category error = %v", err)
 	}
 }
@@ -196,14 +191,10 @@ func TestLoadConfigNormalizesINIAndKeepsExplicitSwitches(t *testing.T) {
 	raw := `[auction_price]
 equipment_level_min = 40
 equipment_level_max = 70
-equip_inflate_min = 4
-equip_inflate_max = 7
-value_category_weight = 0.4
-value_rarity_weight = 0.3
-value_level_weight = 0.2
-value_pvf_weight = 0.1
-value_curve_span = 5
-value_base_price = 2500
+category_price_rules = {"equipment":{"min_price":2500,"max_price":9000000,"rarity_weight":0.4,"level_weight":0.3,"pvf_weight":0.3}}
+equipment_multiplier_min = 1.25
+equipment_multiplier_max = 2.5
+equipment_final_max_price = 200000000
 upgrade_min = 6
 upgrade_max = 11
 upgrade_price_rate = 0.12
@@ -227,7 +218,7 @@ out_of_range_probability = 0.02
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Restock.EquipmentLevelMin != 40 || cfg.Restock.EquipmentLevelMax != 70 || cfg.Restock.EquipInflateMin != 4 || cfg.Restock.ValueCategoryWeight != 0.4 || cfg.Restock.ValueRarityWeight != 0.3 || cfg.Restock.ValueLevelWeight != 0.2 || cfg.Restock.ValuePVFWeight != 0.1 || cfg.Restock.ValueCurveSpan != 5 || cfg.Restock.ValueBasePrice != 2500 || cfg.Restock.UpgradePriceRate != 0.12 || !cfg.Restock.CustomPriceEnabled {
+	if cfg.Restock.EquipmentLevelMin != 40 || cfg.Restock.EquipmentLevelMax != 70 || cfg.Restock.CategoryPriceRules[valueCategoryEquipment].MinPrice != 2500 || cfg.Restock.CategoryPriceRules[valueCategoryEquipment].MaxPrice != 9000000 || cfg.Restock.EquipmentMultiplierMin != 1.25 || cfg.Restock.EquipmentMultiplierMax != 2.5 || cfg.Restock.UpgradePriceRate != 0.12 || !cfg.Restock.CustomPriceEnabled {
 		t.Fatalf("pricing config=%+v", cfg.Restock)
 	}
 	if cfg.Collector.Enabled || !cfg.Collector.PriceRangeEnabled || cfg.Collector.InRangeProbability != 0.9 || cfg.Collector.OutRangeProbability != 0.02 {
@@ -278,6 +269,8 @@ func TestLoadConfigRejectsUnknownAndDuplicateSettings(t *testing.T) {
 		"[unknown]\nvalue = 1\n",
 		"[auto]\nenabeld = true\n",
 		"[auto]\nenabled = true\nenabled = false\n",
+		"[auction_price]\nvalue_category_recognition = material|10\n",
+		"[auction_price]\nequip_inflate_min = 1\n",
 	} {
 		if err := os.WriteFile(path, []byte(raw), 0644); err != nil {
 			t.Fatal(err)

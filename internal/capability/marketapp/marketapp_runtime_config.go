@@ -2,6 +2,7 @@ package marketapp
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -25,9 +26,8 @@ var marketConfigKeys = map[string]map[string]bool{
 		"equipment_allowed_rarities": true, "other_allowed_rarities": true, "equipment_trade_policy": true, "other_trade_policy": true, "blocked_item_ids": true, "allowed_item_ids": true, "stack_sizes": true,
 		"equipment_qty_min": true, "equipment_qty_max": true,
 		"equipment_level_min": true, "equipment_level_max": true,
-		"equip_inflate_min": true, "equip_inflate_max": true,
 		"upgrade_min": true, "upgrade_max": true, "upgrade_price_rate": true,
-		"value_category_weight": true, "value_rarity_weight": true, "value_level_weight": true, "value_pvf_weight": true, "value_curve_span": true, "value_base_price": true, "value_category_recognition": true,
+		"category_price_rules": true, "equipment_multiplier_min": true, "equipment_multiplier_max": true, "equipment_final_max_price": true,
 		"rand_low": true, "rand_high": true, "custom_price_enabled": true, "custom_price_file": true,
 		"max_actions": true, "max_concurrent": true, "max_result_actions": true, "per_item_delay_ms": true,
 	},
@@ -140,8 +140,7 @@ func validateMarketValue(section, key, value string) error {
 		}
 	case "system_owner.rotate_every",
 		"auction_price.equipment_qty_min", "auction_price.equipment_qty_max",
-		"auction_price.equipment_level_min", "auction_price.equipment_level_max", "auction_price.value_base_price",
-		"auction_price.equip_inflate_min", "auction_price.equip_inflate_max",
+		"auction_price.equipment_level_min", "auction_price.equipment_level_max", "auction_price.equipment_final_max_price",
 		"auction_price.upgrade_min", "auction_price.upgrade_max",
 		"auction_price.max_actions", "auction_price.max_concurrent",
 		"auction_price.max_result_actions", "auction_price.per_item_delay_ms",
@@ -150,8 +149,7 @@ func validateMarketValue(section, key, value string) error {
 		if _, err := strconv.Atoi(value); err != nil {
 			return fmt.Errorf("must be an integer")
 		}
-	case "auction_price.value_category_weight", "auction_price.value_rarity_weight", "auction_price.value_level_weight", "auction_price.value_pvf_weight", "auction_price.value_curve_span",
-		"auction_price.upgrade_price_rate", "auction_price.rand_low", "auction_price.rand_high",
+	case "auction_price.upgrade_price_rate", "auction_price.rand_low", "auction_price.rand_high", "auction_price.equipment_multiplier_min", "auction_price.equipment_multiplier_max",
 		"auction_collect.in_range_probability", "auction_collect.out_of_range_probability":
 		parsed, err := strconv.ParseFloat(value, 64)
 		if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
@@ -167,9 +165,10 @@ func validateMarketValue(section, key, value string) error {
 		if _, err := normalizeAllowedRarities(value); err != nil {
 			return err
 		}
-	case "auction_price.value_category_recognition":
-		if _, err := decodeValueCategoryRecognition(value); err != nil {
-			return err
+	case "auction_price.category_price_rules":
+		var parsed any
+		if err := json.Unmarshal([]byte(value), &parsed); err != nil {
+			return fmt.Errorf("must be valid JSON: %w", err)
 		}
 	case "auction_price.equipment_trade_policy", "auction_price.other_trade_policy":
 		if value != tradePolicyPermissive && value != tradePolicyStrict {

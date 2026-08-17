@@ -33,10 +33,9 @@ func DefaultConfig() Config {
 		Restock: RestockCfg{
 			Comments: defaultRestockComments(), EquipmentAllowedRarities: defaultEquipmentRarities, OtherAllowedRarities: defaultOtherRarities,
 			EquipmentTradePolicy: tradePolicyPermissive, OtherTradePolicy: tradePolicyPermissive, StackSizes: []int{500, 1000, 2000},
-			EquipmentQtyMin: 2, EquipmentQtyMax: 5, EquipInflateMin: 1, EquipInflateMax: 2,
-			ValueCategoryWeight: 0.45, ValueRarityWeight: 0.25, ValueLevelWeight: 0.20, ValuePVFWeight: 0.10,
-			ValueCurveSpan: 6, ValueBasePrice: 1000, ValueCategoryRecognition: defaultValueCategoryRecognition(),
-			UpgradeMin: 7, UpgradeMax: 13, UpgradePriceRate: 0.08, RandLow: 0.9, RandHigh: 1.1,
+			EquipmentQtyMin: 2, EquipmentQtyMax: 5,
+			CategoryPriceRules: defaultCategoryPriceRules(), EquipmentMultiplierMin: 1, EquipmentMultiplierMax: 2, EquipmentFinalMaxPrice: 200000000,
+			UpgradeMin: 7, UpgradeMax: 13, UpgradePriceRate: 0.08, RandLow: 0.95, RandHigh: 1.05,
 			MaxActions: defaultMarketMaxActions, MaxConcurrent: 8, MaxResultActions: 200,
 		},
 		Cera: CeraCfg{Comments: defaultCeraComments(), Items: defaultCeraRows()},
@@ -110,24 +109,17 @@ func decodeMarketINI(ini *foundationconfig.INIConfig) (Config, error) {
 	c.Restock.EquipmentQtyMax = ini.GetInt("auction_price", "equipment_qty_max", d.Restock.EquipmentQtyMax)
 	c.Restock.EquipmentLevelMin = ini.GetInt("auction_price", "equipment_level_min", d.Restock.EquipmentLevelMin)
 	c.Restock.EquipmentLevelMax = ini.GetInt("auction_price", "equipment_level_max", d.Restock.EquipmentLevelMax)
-	c.Restock.EquipInflateMin = ini.GetInt("auction_price", "equip_inflate_min", d.Restock.EquipInflateMin)
-	c.Restock.EquipInflateMax = ini.GetInt("auction_price", "equip_inflate_max", d.Restock.EquipInflateMax)
 	c.Restock.UpgradeMin = ini.GetInt("auction_price", "upgrade_min", d.Restock.UpgradeMin)
 	c.Restock.UpgradeMax = ini.GetInt("auction_price", "upgrade_max", d.Restock.UpgradeMax)
 	c.Restock.UpgradePriceRate = iniFloat(ini, "auction_price", "upgrade_price_rate", d.Restock.UpgradePriceRate)
 	c.Restock.RandLow = iniFloat(ini, "auction_price", "rand_low", d.Restock.RandLow)
 	c.Restock.RandHigh = iniFloat(ini, "auction_price", "rand_high", d.Restock.RandHigh)
-	c.Restock.ValueCategoryWeight = iniFloat(ini, "auction_price", "value_category_weight", d.Restock.ValueCategoryWeight)
-	c.Restock.ValueRarityWeight = iniFloat(ini, "auction_price", "value_rarity_weight", d.Restock.ValueRarityWeight)
-	c.Restock.ValueLevelWeight = iniFloat(ini, "auction_price", "value_level_weight", d.Restock.ValueLevelWeight)
-	c.Restock.ValuePVFWeight = iniFloat(ini, "auction_price", "value_pvf_weight", d.Restock.ValuePVFWeight)
-	c.Restock.ValueCurveSpan = iniFloat(ini, "auction_price", "value_curve_span", d.Restock.ValueCurveSpan)
-	c.Restock.ValueBasePrice = int32(ini.GetInt("auction_price", "value_base_price", int(d.Restock.ValueBasePrice)))
-	var valueErr error
-	c.Restock.ValueCategoryRecognition, valueErr = decodeValueCategoryRecognition(ini.GetString("auction_price", "value_category_recognition", encodeValueCategoryRecognition(d.Restock.ValueCategoryRecognition)))
-	if valueErr != nil {
-		return Config{}, valueErr
+	if err := json.Unmarshal([]byte(ini.GetString("auction_price", "category_price_rules", mustJSON(d.Restock.CategoryPriceRules))), &c.Restock.CategoryPriceRules); err != nil {
+		return Config{}, fmt.Errorf("auction_price.category_price_rules: %w", err)
 	}
+	c.Restock.EquipmentMultiplierMin = iniFloat(ini, "auction_price", "equipment_multiplier_min", d.Restock.EquipmentMultiplierMin)
+	c.Restock.EquipmentMultiplierMax = iniFloat(ini, "auction_price", "equipment_multiplier_max", d.Restock.EquipmentMultiplierMax)
+	c.Restock.EquipmentFinalMaxPrice = int32(ini.GetInt("auction_price", "equipment_final_max_price", int(d.Restock.EquipmentFinalMaxPrice)))
 	c.Restock.CustomPriceEnabled = iniBool(ini, "auction_price", "custom_price_enabled", d.Restock.CustomPriceEnabled)
 	c.Restock.MaxActions = ini.GetInt("auction_price", "max_actions", d.Restock.MaxActions)
 	c.Restock.MaxConcurrent = ini.GetInt("auction_price", "max_concurrent", d.Restock.MaxConcurrent)
@@ -177,20 +169,15 @@ func writeMarketConfig(path string, c Config) error {
 		"# 每种缺货装备最多生成的拍卖记录数。", fmt.Sprintf("equipment_qty_max = %d", c.Restock.EquipmentQtyMax),
 		"# 允许上架的最低装备等级；0 表示不限制最低等级。", fmt.Sprintf("equipment_level_min = %d", c.Restock.EquipmentLevelMin),
 		"# 允许上架的最高装备等级；0 表示不限制最高等级。", fmt.Sprintf("equipment_level_max = %d", c.Restock.EquipmentLevelMax),
-		"# 装备基础价格的最小随机倍率。", fmt.Sprintf("equip_inflate_min = %d", c.Restock.EquipInflateMin),
-		"# 装备基础价格的最大随机倍率。", fmt.Sprintf("equip_inflate_max = %d", c.Restock.EquipInflateMax),
 		"# 装备随机强化的最低等级。", fmt.Sprintf("upgrade_min = %d", c.Restock.UpgradeMin),
 		"# 装备随机强化的最高等级。", fmt.Sprintf("upgrade_max = %d", c.Restock.UpgradeMax),
-		"# 每级强化的价格加成比例；+10 以上还会使用同一比例叠加二次增长的损坏风险溢价。", "upgrade_price_rate = " + formatFloat(c.Restock.UpgradePriceRate),
+		"# 强化加价率（非线性）；+0 到 +10 按等级增长，+10 以上叠加二次增长的损坏风险溢价。", "upgrade_price_rate = " + formatFloat(c.Restock.UpgradePriceRate),
 		"# 最终价格的最小随机倍率。", "rand_low = " + formatFloat(c.Restock.RandLow),
 		"# 最终价格的最大随机倍率。", "rand_high = " + formatFloat(c.Restock.RandHigh),
-		"# 价值模型中类别认可度的权重。", "value_category_weight = " + formatFloat(c.Restock.ValueCategoryWeight),
-		"# 价值模型中稀有度的权重。", "value_rarity_weight = " + formatFloat(c.Restock.ValueRarityWeight),
-		"# 价值模型中等级的权重。", "value_level_weight = " + formatFloat(c.Restock.ValueLevelWeight),
-		"# 价值模型中 PVF price/value 参考信号的权重。", "value_pvf_weight = " + formatFloat(c.Restock.ValuePVFWeight),
-		"# 价值分到价格的指数曲线跨度。", "value_curve_span = " + formatFloat(c.Restock.ValueCurveSpan),
-		"# 价值分为 0 时的基础金币价格。", fmt.Sprintf("value_base_price = %d", c.Restock.ValueBasePrice),
-		"# 有效价值分类认可度，格式为 category|score，使用分号分隔。", "value_category_recognition = " + encodeValueCategoryRecognition(c.Restock.ValueCategoryRecognition),
+		"# 所有分类（含装备）的单价范围与分类内价值权重。", "category_price_rules = " + mustJSON(c.Restock.CategoryPriceRules),
+		"# 装备分类基础价的最小倍率。", "equipment_multiplier_min = " + formatFloat(c.Restock.EquipmentMultiplierMin),
+		"# 装备分类基础价的最大倍率。", "equipment_multiplier_max = " + formatFloat(c.Restock.EquipmentMultiplierMax),
+		"# 装备计算强化和随机波动后的最终单价上限。", fmt.Sprintf("equipment_final_max_price = %d", c.Restock.EquipmentFinalMaxPrice),
 		"# 是否启用 conf/market_item_price_ranges.json 中的物品独立最终价格范围；有效配置优先于上面的通用公式。", "custom_price_enabled = " + strconv.FormatBool(c.Restock.CustomPriceEnabled),
 		"# 单轮补货最多生成并执行的动作数；0 表示配置层不限制。", fmt.Sprintf("max_actions = %d", c.Restock.MaxActions),
 		"# 补货动作的最大并发工作数。", fmt.Sprintf("max_concurrent = %d", c.Restock.MaxConcurrent),
@@ -233,6 +220,14 @@ func writeAtomicFile(path string, data []byte) error {
 
 func boolPtr(v bool) *bool         { return &v }
 func formatFloat(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
+
+func mustJSON(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return string(data)
+}
 func iniBool(c *foundationconfig.INIConfig, section, key string, fallback bool) bool {
 	v, err := strconv.ParseBool(strings.TrimSpace(c.GetString(section, key, strconv.FormatBool(fallback))))
 	if err != nil {
