@@ -83,7 +83,10 @@ func runMain() int {
 	foundationlog.SetRobotSink(func(msg string) {
 		dnf.LogString(msg)
 	})
-	defer dnf.LogClose()
+	defer func() {
+		foundationlog.SetRobotSink(nil)
+		dnf.LogClose()
+	}()
 	dnf.LogString(fmt.Sprintf("ROBOT_CONFIG path=%s config_dir=%s\n", configPath, cfg.ConfigDir))
 	dnf.LogString(fmt.Sprintf("NETWORK_CONFIG game=%s:%d setting=%s login_ip=%s relay=%s:%d auction=%s:%d point=%s:%d service_root=%s run_script=%s\n",
 		cfg.RobotConnectIP, cfg.RobotGamePort, cfg.RobotConnectIPSetting, cfg.RobotInnerIP,
@@ -169,8 +172,8 @@ func runMain() int {
 	})
 	runtimeFiles.Start()
 	defer func() {
-		marketApp.Shutdown()
 		runtimeFiles.Close()
+		marketApp.Shutdown()
 	}()
 	if _, err := manager.RepairRobotEquipment(); err != nil {
 		dnf.LogString(fmt.Sprintf("EQUIPMENT_REPAIR_FAILED err=%v\n", err))

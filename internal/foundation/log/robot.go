@@ -1,19 +1,26 @@
 package log
 
-import "fmt"
+import (
+	"fmt"
+	"sync/atomic"
+)
 
 type Sink func(msg string)
 
-var robotSink Sink
+var robotSink atomic.Pointer[Sink]
 
 func SetRobotSink(sink Sink) {
-	robotSink = sink
+	if sink == nil {
+		robotSink.Store(nil)
+		return
+	}
+	robotSink.Store(&sink)
 }
 
 func Robotf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	if robotSink != nil {
-		robotSink(msg)
+	if sink := robotSink.Load(); sink != nil {
+		(*sink)(msg)
 		return
 	}
 	fmt.Print(msg)

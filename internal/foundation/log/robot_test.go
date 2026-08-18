@@ -3,6 +3,8 @@ package log
 import (
 	"io"
 	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -37,5 +39,36 @@ func TestRobotfUsesSinkWithoutDuplicatingStdout(t *testing.T) {
 	}
 	if len(stdout) != 0 {
 		t.Fatalf("stdout duplicated sink message: %q", stdout)
+	}
+}
+
+func TestRobotSinkCanBeReplacedWhileLogging(t *testing.T) {
+	defer SetRobotSink(nil)
+
+	var calls atomic.Int64
+	sink := func(string) {
+		calls.Add(1)
+	}
+	SetRobotSink(sink)
+
+	const iterations = 1000
+	var writers sync.WaitGroup
+	writers.Add(2)
+	go func() {
+		defer writers.Done()
+		for i := 0; i < iterations; i++ {
+			SetRobotSink(sink)
+		}
+	}()
+	go func() {
+		defer writers.Done()
+		for i := 0; i < iterations; i++ {
+			Robotf("event=%d\n", i)
+		}
+	}()
+	writers.Wait()
+
+	if got := calls.Load(); got != iterations {
+		t.Fatalf("sink calls = %d, want %d", got, iterations)
 	}
 }
