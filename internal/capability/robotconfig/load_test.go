@@ -63,14 +63,13 @@ prefer_avatar_sets = false
 avatar_set_min_slots = 3
 
 [store]
-store_item_slots = 2
-store_item_count_min = 3
-store_item_count_max = 5
 store_equipment_price_min = 1000
 store_equipment_price_max = 2000
+store_equipment_level_weight = 7
+store_equipment_rarity_weight = 8
+store_equipment_intensify_weight = 5
 store_material_price_min = 30
 store_material_price_max = 40
-store_inventory_start_box_index = 8
 store_equipment_start_box_index = 9
 store_material_start_box_index = 107
 store_equipment_intensify_min = 8
@@ -142,6 +141,9 @@ packet_rate_per_sec = 30
 	if rc.StoreEquipmentPriceMin != 1000 || rc.StoreEquipmentPriceMax != 2000 || rc.StoreMaterialPriceMin != 30 || rc.StoreMaterialPriceMax != 40 {
 		t.Fatalf("store prices not loaded: %+v", rc)
 	}
+	if rc.StoreEquipmentLevelWeight != 7 || rc.StoreEquipmentRarityWeight != 8 || rc.StoreEquipmentIntensifyWeight != 5 {
+		t.Fatalf("store price weights not loaded: %+v", rc)
+	}
 	if rc.FollowAccount != "leader" || rc.AutoTargetOnlineCount != 200 || rc.SchedulerOnlineBatchSize != 42 || rc.SystemActorPollMS != 777 {
 		t.Fatalf("follow/auto/scheduler/system config not loaded: %+v", rc)
 	}
@@ -167,7 +169,10 @@ func TestLoadFileRejectsInvalidOrUnknownSettings(t *testing.T) {
 		"[equipment]\nequip_slots = 0,1\n",
 		"[avatar]\navatar_slots = 0,1\nmin_avatar_slots = 3\n",
 		"[store]\nstore_item_allow_ids = 3037\n",
+		"[store]\nstore_item_slots = 7\n",
 		"[store]\nstore_equipment_intensify_min = 14\nstore_equipment_intensify_max = 13\n",
+		"[store]\nstore_equipment_level_weight = 0\nstore_equipment_rarity_weight = 0\nstore_equipment_intensify_weight = 0\n",
+		"[store]\nstore_equipment_level_weight = -1\n",
 		"[auto]\nauto_store_probability_percent = 101\n",
 		"[scheduler]\nonline_batch_size = 121\n",
 		"[system]\nactor_poll_ms = 99\n",

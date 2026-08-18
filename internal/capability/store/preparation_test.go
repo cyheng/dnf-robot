@@ -89,6 +89,13 @@ func TestPreparePoolInventoryUsesPVFMaterialStackLimitCappedAtOneThousand(t *tes
 	}
 }
 
+func TestPrepareInventoryRequiresCurrentItemPool(t *testing.T) {
+	preparer := Preparer{Env: testPreparationEnv{}, WorldHorns: NewWorldHornCache()}
+	if err := preparer.EnsureInventoryAndStall(robotcap.Info{UID: 17000001, CID: 1}, robotconfig.Default()); err == nil {
+		t.Fatal("missing item pool unexpectedly used a legacy fallback")
+	}
+}
+
 func countInventoryType(raw []byte, inventoryType int) int {
 	count := 0
 	for rawIndex := 0; rawIndex < 249; rawIndex++ {
@@ -151,37 +158,52 @@ func TestStorePoolPricesScaleAllRowsWhenWholeDisplayExceedsLimit(t *testing.T) {
 
 func TestStoreEquipmentPriceUsesLevelRarityAndUpgrade(t *testing.T) {
 	const minPrice, maxPrice = 500000, 1000000
-	base := storeEquipmentPrice(1, 0, 0, minPrice, maxPrice)
-	highLevel := storeEquipmentPrice(70, 0, 0, minPrice, maxPrice)
-	highRarity := storeEquipmentPrice(1, 5, 0, minPrice, maxPrice)
-	highUpgrade := storeEquipmentPrice(1, 0, 13, minPrice, maxPrice)
+	rc := testStorePriceConfig(minPrice, maxPrice)
+	base := storeEquipmentPrice(1, 0, 0, rc)
+	highLevel := storeEquipmentPrice(70, 0, 0, rc)
+	highRarity := storeEquipmentPrice(1, 5, 0, rc)
+	highUpgrade := storeEquipmentPrice(1, 0, 13, rc)
 	if highLevel <= base || highRarity <= base || highUpgrade <= base {
 		t.Fatalf("prices base=%d level=%d rarity=%d upgrade=%d", base, highLevel, highRarity, highUpgrade)
 	}
-	if got := storeEquipmentPrice(70, 5, 13, minPrice, maxPrice); got != maxPrice {
+	if got := storeEquipmentPrice(70, 5, 13, rc); got != maxPrice {
 		t.Fatalf("maximum quality price=%d want=%d", got, maxPrice)
 	}
 }
 
 func TestStoreEquipmentPriceAddsUpgradeRiskPremiumAboveTen(t *testing.T) {
 	const minPrice, maxPrice = 500000, 1000000
-	price10 := storeEquipmentPrice(35, 2, 10, minPrice, maxPrice)
-	price11 := storeEquipmentPrice(35, 2, 11, minPrice, maxPrice)
-	price12 := storeEquipmentPrice(35, 2, 12, minPrice, maxPrice)
+	rc := testStorePriceConfig(minPrice, maxPrice)
+	price10 := storeEquipmentPrice(35, 2, 10, rc)
+	price11 := storeEquipmentPrice(35, 2, 11, rc)
+	price12 := storeEquipmentPrice(35, 2, 12, rc)
 	if price11 <= price10 || price12-price11 <= price11-price10 {
 		t.Fatalf("upgrade prices +10=%d +11=%d +12=%d", price10, price11, price12)
 	}
 }
 
 func TestStoreEquipmentPriceClampsInputsAndRange(t *testing.T) {
-	if got := storeEquipmentPrice(-10, -2, -1, 500000, 1000000); got != 500000 {
+	rc := testStorePriceConfig(500000, 1000000)
+	if got := storeEquipmentPrice(-10, -2, -1, rc); got != 500000 {
 		t.Fatalf("minimum price=%d want=500000", got)
 	}
-	if got := storeEquipmentPrice(999, 99, 255, 500000, 1000000); got != 1000000 {
+	if got := storeEquipmentPrice(999, 99, 255, rc); got != 1000000 {
 		t.Fatalf("clamped maximum price=%d want=1000000", got)
 	}
-	if got := storeEquipmentPrice(70, 5, 13, 900, 800); got != 900 {
+	rc.StoreEquipmentPriceMin, rc.StoreEquipmentPriceMax = 900, 800
+	if got := storeEquipmentPrice(70, 5, 13, rc); got != 900 {
 		t.Fatalf("invalid range price=%d want=900", got)
+	}
+}
+
+func TestStoreEquipmentPriceNormalizesConfiguredWeights(t *testing.T) {
+	percent := testStorePriceConfig(500000, 1000000)
+	ratio := percent
+	ratio.StoreEquipmentLevelWeight = 7
+	ratio.StoreEquipmentRarityWeight = 8
+	ratio.StoreEquipmentIntensifyWeight = 5
+	if got, want := storeEquipmentPrice(52, 4, 11, ratio), storeEquipmentPrice(52, 4, 11, percent); got != want {
+		t.Fatalf("normalized price=%d want=%d", got, want)
 	}
 }
 
@@ -194,82 +216,24 @@ func TestStorePoolPricesUseActualEquipmentMetadata(t *testing.T) {
 	}
 	entries[0].SlotBytes[6] = 0
 	entries[1].SlotBytes[6] = 13
-	rc := robotconfig.RuntimeConfig{StoreEquipmentPriceMin: 500000, StoreEquipmentPriceMax: 1000000}
+	rc := testStorePriceConfig(500000, 1000000)
 	assignStorePoolPrices(env, rc, nil, equipment, entries)
-	if equipment[0].Price != storeEquipmentPrice(1, 0, 0, 500000, 1000000) || equipment[1].Price != 1000000 {
+	if equipment[0].Price != storeEquipmentPrice(1, 0, 0, rc) || equipment[1].Price != 1000000 {
 		t.Fatalf("equipment prices=%+v", equipment)
 	}
 }
 
-func TestSelectStoreItemsUsesCatalogMaterialRules(t *testing.T) {
-	preparer := Preparer{Env: testPreparationEnv{catalog: []shared.EquipmentCatalogItem{
-		{ID: 3037, Level: 1, Slot: "material", Trade: true, BasicMaterial: true, Icon: "stackable/material.img", FieldImage: "material/ore", StackLimit: 1000},
-		{ID: 3031, Level: 1, Slot: "material", Trade: true, Icon: "stackable/material.img", FieldImage: "material/cloth", StackLimit: 1000},
-		{ID: 3032, Level: 99, Slot: "material", Trade: true, Icon: "stackable/material.img", FieldImage: "material/high", StackLimit: 1000},
-		{ID: 7312, Level: 1, Slot: "material", Trade: true, Icon: "stackable/material.img", FieldImage: "material/deny", StackLimit: 1000},
-		{ID: 3034, Level: 1, Slot: "material", Trade: true, Icon: "stackable/etc.img", FieldImage: "material/bad_icon", StackLimit: 1000},
-		{ID: 3035, Level: 1, Slot: "material", Trade: true, Icon: "stackable/material.img", StackLimit: 1000},
-	}}}
-
-	rc := robotconfig.RuntimeConfig{
-		StoreItemSlots:         4,
-		StoreInventoryStartBox: 7,
-	}
-	items := preparer.selectItemsForPlan(robotcap.Info{Level: 10}, rc, InventoryPlanFor(rc.StoreInventoryStartBox), preparer.Env.StackableCatalog())
-
-	got := storeItemIDSet(items)
-	if len(got) != 1 || !got[3037] {
-		t.Fatalf("selected IDs got %v want only basic valid material 3037", got)
-	}
-}
-
-func TestSelectStoreItemsDoesNotSynthesizeMissingCatalogEntries(t *testing.T) {
-	preparer := Preparer{Env: testPreparationEnv{catalog: []shared.EquipmentCatalogItem{
-		{ID: 9001, Level: 1, Slot: "material", Trade: true, Icon: "stackable/etc.img", FieldImage: "material/invalid", StackLimit: 1000},
-	}}}
-
-	rc := robotconfig.RuntimeConfig{
-		StoreItemSlots:         4,
-		StoreInventoryStartBox: 7,
-	}
-	items := preparer.selectItemsForPlan(robotcap.Info{Level: 10}, rc, InventoryPlanFor(rc.StoreInventoryStartBox), preparer.Env.StackableCatalog())
-
-	if len(items) != 0 {
-		t.Fatalf("invalid catalog unexpectedly produced synthetic items: %+v", items)
-	}
-}
-
-func TestSelectStoreItemsBoundsLargeCatalogSample(t *testing.T) {
-	catalog := make([]shared.EquipmentCatalogItem, 5000)
-	for i := range catalog {
-		catalog[i] = shared.EquipmentCatalogItem{
-			ID:         i + 1,
-			Level:      1,
-			Slot:       "material",
-			Trade:      true,
-			Icon:       "stackable/material.img",
-			FieldImage: "material/item",
-			StackLimit: 1000,
-		}
-	}
-	preparer := Preparer{Env: testPreparationEnv{catalog: catalog}}
-
-	rc := robotconfig.RuntimeConfig{
-		StoreItemSlots:         24,
-		StoreInventoryStartBox: 7,
-	}
-	items := preparer.selectItemsForPlan(robotcap.Info{UID: 17000001, Level: 10}, rc, InventoryPlanFor(rc.StoreInventoryStartBox), preparer.Env.StackableCatalog())
-
-	if len(items) != 24 {
-		t.Fatalf("selected items got %d want 24", len(items))
-	}
-	if got := len(storeItemIDSet(items)); got != len(items) {
-		t.Fatalf("selected items contain duplicates: unique=%d items=%d", got, len(items))
+func testStorePriceConfig(minPrice, maxPrice int) robotconfig.RuntimeConfig {
+	return robotconfig.RuntimeConfig{
+		StoreEquipmentPriceMin:        minPrice,
+		StoreEquipmentPriceMax:        maxPrice,
+		StoreEquipmentLevelWeight:     35,
+		StoreEquipmentRarityWeight:    40,
+		StoreEquipmentIntensifyWeight: 25,
 	}
 }
 
 type testPreparationEnv struct {
-	catalog   []shared.EquipmentCatalogItem
 	inventory []byte
 	saved     *[]byte
 	stalls    *[]StallItem
@@ -311,18 +275,6 @@ func (e testPreparationEnv) SaveInventoryRaw(cid int, raw []byte) error {
 	return nil
 }
 
-func (e testPreparationEnv) StackableCatalog() []shared.EquipmentCatalogItem {
-	return e.catalog
-}
-
 func (e testPreparationEnv) StoreTitle(uid int, rc robotconfig.RuntimeConfig) string {
 	return fallbackStoreTitle(uid)
-}
-
-func storeItemIDSet(items []shared.EquipmentCatalogItem) map[int]bool {
-	out := make(map[int]bool, len(items))
-	for _, item := range items {
-		out[item.ID] = true
-	}
-	return out
 }

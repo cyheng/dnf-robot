@@ -14,9 +14,9 @@ func Default() RuntimeConfig {
 		EquipSlots: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, EquipRarityMin: 0, EquipRarityMax: 5, EquipIntensifyMin: 7, EquipIntensifyMax: 10, EquipSmithingMin: 0, EquipSmithingMax: 8,
 		PreferEquipSets: true, EquipSetMinSlots: 2,
 		AvatarSlots: []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, MinAvatarSlots: 8, PreferAvatarSets: true, AvatarSetMinSlots: 2,
-		StoreItemSlots: 1, StoreItemCountMin: 1, StoreItemCountMax: 1, StoreInventoryStartBox: 7,
 		StoreEquipmentStartBox: 7, StoreMaterialStartBox: 105, StoreEquipmentIntensifyMin: 7, StoreEquipmentIntensifyMax: 13,
 		StoreEquipmentPriceMin: 500000, StoreEquipmentPriceMax: 1000000, StoreMaterialPriceMin: 10, StoreMaterialPriceMax: 50,
+		StoreEquipmentLevelWeight: 35, StoreEquipmentRarityWeight: 40, StoreEquipmentIntensifyWeight: 25,
 		StoreConfirmTimeoutSec: 30,
 		FollowRadiusX:          120, FollowRadiusY: 30, ShoutDelayMS: 1000, ShoutSendEnabled: true,
 		AutoActions: true, AutoMailNotify: true, AutoTargetOnlineCount: 20,
@@ -252,21 +252,6 @@ func Normalize(rc *RuntimeConfig) {
 	if rc.SystemPacketRatePerSec <= 0 {
 		rc.SystemPacketRatePerSec = 20
 	}
-	if rc.StoreItemSlots <= 0 {
-		rc.StoreItemSlots = 1
-	}
-	if rc.StoreItemSlots > 24 {
-		rc.StoreItemSlots = 24
-	}
-	if rc.StoreItemCountMin <= 0 {
-		rc.StoreItemCountMin = 1
-	}
-	if rc.StoreItemCountMax <= 0 {
-		rc.StoreItemCountMax = rc.StoreItemCountMin
-	}
-	if rc.StoreItemCountMax < rc.StoreItemCountMin {
-		rc.StoreItemCountMin, rc.StoreItemCountMax = rc.StoreItemCountMax, rc.StoreItemCountMin
-	}
 	if rc.StoreEquipmentPriceMin <= 0 {
 		rc.StoreEquipmentPriceMin = 500000
 	}
@@ -276,6 +261,20 @@ func Normalize(rc *RuntimeConfig) {
 	if rc.StoreEquipmentPriceMax < rc.StoreEquipmentPriceMin {
 		rc.StoreEquipmentPriceMin, rc.StoreEquipmentPriceMax = rc.StoreEquipmentPriceMax, rc.StoreEquipmentPriceMin
 	}
+	if rc.StoreEquipmentLevelWeight < 0 {
+		rc.StoreEquipmentLevelWeight = 0
+	}
+	if rc.StoreEquipmentRarityWeight < 0 {
+		rc.StoreEquipmentRarityWeight = 0
+	}
+	if rc.StoreEquipmentIntensifyWeight < 0 {
+		rc.StoreEquipmentIntensifyWeight = 0
+	}
+	if rc.StoreEquipmentLevelWeight == 0 && rc.StoreEquipmentRarityWeight == 0 && rc.StoreEquipmentIntensifyWeight == 0 {
+		rc.StoreEquipmentLevelWeight = 35
+		rc.StoreEquipmentRarityWeight = 40
+		rc.StoreEquipmentIntensifyWeight = 25
+	}
 	if rc.StoreMaterialPriceMin <= 0 {
 		rc.StoreMaterialPriceMin = 10
 	}
@@ -284,12 +283,6 @@ func Normalize(rc *RuntimeConfig) {
 	}
 	if rc.StoreMaterialPriceMax < rc.StoreMaterialPriceMin {
 		rc.StoreMaterialPriceMin, rc.StoreMaterialPriceMax = rc.StoreMaterialPriceMax, rc.StoreMaterialPriceMin
-	}
-	if rc.StoreInventoryStartBox <= 0 || rc.StoreInventoryStartBox == 105 {
-		rc.StoreInventoryStartBox = 7
-	}
-	if rc.StoreInventoryStartBox > 240 {
-		rc.StoreInventoryStartBox = 240
 	}
 	if rc.StoreEquipmentStartBox < 7 || rc.StoreEquipmentStartBox > 43 {
 		rc.StoreEquipmentStartBox = 7

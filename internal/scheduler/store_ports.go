@@ -217,10 +217,6 @@ func (e storePreparationEnv) SaveInventoryRaw(cid int, raw []byte) error {
 	return e.manager.schemaRepo().SaveInventoryRaw(cid, raw)
 }
 
-func (e storePreparationEnv) StackableCatalog() []shared.EquipmentCatalogItem {
-	return e.manager.loadStackableCatalog()
-}
-
 func (m *RobotManager) storeMaintenance() storecap.Maintenance {
 	return storecap.Maintenance{Env: storeMaintenanceEnv{manager: m}}
 }

@@ -73,13 +73,6 @@ func (m *RobotManager) loadItemCatalogs() catalog.ItemCatalogView {
 	return catalog.ViewItemCatalogs(layout.New(m.cfg.ConfigDir).PVF)
 }
 
-func (m *RobotManager) loadStackableCatalog() []shared.EquipmentCatalogItem {
-	if m.cfg == nil {
-		return nil
-	}
-	return catalog.ViewStackable(layout.New(m.cfg.ConfigDir).PVF)
-}
-
 func (m *RobotManager) applyConfiguredLocation(info *robotcap.Info, rc robotconfig.RuntimeConfig, maps []shared.MapCatalogItem) {
 	robotspawn.ApplyConfiguredLocation(spawnEnv{manager: m}, info, rc, maps)
 }

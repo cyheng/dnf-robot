@@ -2,7 +2,6 @@ package store
 
 import (
 	"encoding/binary"
-	"strings"
 
 	"robot/internal/shared"
 )
@@ -13,11 +12,6 @@ const (
 	WorldHornBoxIndex = 55
 	WorldHornRawIndex = WorldHornBoxIndex + 2
 )
-
-type InventoryPlan struct {
-	Name     string
-	StartBox int
-}
 
 type StallItem struct {
 	ItemID int
@@ -38,37 +32,6 @@ type PermissionStatus struct {
 	EventEntry int
 }
 
-func InventoryPlanFor(startBox int) InventoryPlan {
-	start := startBox
-	if start <= 0 || start == 7 {
-		start = 105
-	}
-	return InventoryPlan{Name: "material-default", StartBox: start}
-}
-
-func InventoryClearStartBoxes(start int) []int {
-	if start == 105 {
-		return []int{105}
-	}
-	return []int{start, 105}
-}
-
-func AttachAllowed(attach string) bool {
-	attach = strings.ToLower(strings.TrimSpace(attach))
-	if attach == "" {
-		return false
-	}
-	if strings.Contains(attach, "account") || strings.Contains(attach, "creature") || strings.Contains(attach, "unable") || strings.Contains(attach, "not") {
-		return false
-	}
-	return strings.Contains(attach, "trade") || attach == "free" || attach == "sealing"
-}
-
-func AttachPreferred(attach string) bool {
-	attach = strings.ToLower(strings.TrimSpace(attach))
-	return attach == "trade" || strings.Contains(attach, "trade ") || attach == "free" || attach == "sealing"
-}
-
 func InventoryTypeForBoxIndex(boxIndex int) int {
 	switch {
 	case boxIndex >= 7 && boxIndex <= 54:
@@ -83,21 +46,6 @@ func InventoryTypeForBoxIndex(boxIndex int) int {
 		return 10
 	default:
 		return 2
-	}
-}
-
-func InventoryTypeForStackable(item shared.EquipmentCatalogItem, fallback int) int {
-	switch strings.ToLower(strings.TrimSpace(item.Slot)) {
-	case "waste", "usable", "consumable":
-		return 2
-	case "material":
-		return 3
-	case "quest":
-		return 4
-	case "profession", "expert job":
-		return 10
-	default:
-		return fallback
 	}
 }
 

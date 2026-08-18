@@ -46,14 +46,13 @@ type RuntimeConfig struct {
 	MinAvatarSlots                int    `json:"min_avatar_slots"`
 	PreferAvatarSets              bool   `json:"prefer_avatar_sets"`
 	AvatarSetMinSlots             int    `json:"avatar_set_min_slots"`
-	StoreItemSlots                int    `json:"store_item_slots"`
-	StoreItemCountMin             int    `json:"store_item_count_min"`
-	StoreItemCountMax             int    `json:"store_item_count_max"`
 	StoreEquipmentPriceMin        int    `json:"store_equipment_price_min"`
 	StoreEquipmentPriceMax        int    `json:"store_equipment_price_max"`
+	StoreEquipmentLevelWeight     int    `json:"store_equipment_level_weight"`
+	StoreEquipmentRarityWeight    int    `json:"store_equipment_rarity_weight"`
+	StoreEquipmentIntensifyWeight int    `json:"store_equipment_intensify_weight"`
 	StoreMaterialPriceMin         int    `json:"store_material_price_min"`
 	StoreMaterialPriceMax         int    `json:"store_material_price_max"`
-	StoreInventoryStartBox        int    `json:"store_inventory_start_box_index"`
 	StoreEquipmentStartBox        int    `json:"store_equipment_start_box_index"`
 	StoreMaterialStartBox         int    `json:"store_material_start_box_index"`
 	StoreEquipmentIntensifyMin    int    `json:"store_equipment_intensify_min"`
