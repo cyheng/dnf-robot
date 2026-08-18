@@ -27,7 +27,7 @@ func TestEmptyCatalogDirectoryNeverReadsWorkingDirectory(t *testing.T) {
 		"map_catalog.json":           `[{"village":1,"area":0}]`,
 		"equipment_catalog.json":     `[{"id":123}]`,
 		"stackable_catalog.json":     `[{"id":456}]`,
-		"party_skill_catalog.json":   `{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":2,"state":3,"level":1}]}`,
+		"party_skill_catalog.json":   `{"enabled":true,"max_skill_level":70,"skills":[{"enabled":true,"job":1,"skill_index":2,"state":3,"level":1}]}`,
 	}
 	for name, data := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0644); err != nil {

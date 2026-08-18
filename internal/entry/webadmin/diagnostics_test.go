@@ -79,7 +79,7 @@ func TestSkillCatalogCheckReportsWhitelistRisks(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := paths.PartySkills()
-	raw := `{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":2,"state":3,"level":71,"state_data":[256]}]}`
+	raw := `{"enabled":true,"max_skill_level":70,"skills":[{"enabled":true,"job":1,"skill_index":2,"state":3,"level":71,"state_data":[256]}]}`
 	if err := os.WriteFile(path, []byte(raw), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -107,9 +107,9 @@ func TestSkillDiagnosticsReportsEffectiveCandidatesByJob(t *testing.T) {
   "enabled":true,
   "max_skill_level":70,
   "skills":[
-    {"job":1,"skill_index":2,"state":3,"level":10,"script_path":"SQR\\fighter\\a.nut","state_data":[1]},
-    {"job":1,"skill_index":4,"state":5,"level":20,"state_data":[2]},
-    {"job":2,"skill_index":6,"state":7,"level":30,"state_data":[3]}
+    {"enabled":true,"job":1,"skill_index":2,"state":3,"level":10,"script_path":"SQR\\fighter\\a.nut","state_data":[1]},
+    {"enabled":true,"job":1,"skill_index":4,"state":5,"level":20,"state_data":[2]},
+    {"enabled":true,"job":2,"skill_index":6,"state":7,"level":30,"state_data":[3]}
   ]
 }`
 	pvf := `[
@@ -140,8 +140,8 @@ func TestSkillDiagnosticsWarnsButKeepsValidWhitelistEntries(t *testing.T) {
   "enabled":true,
   "max_skill_level":70,
   "skills":[
-    {"job":6,"skill_index":3,"state":22,"level":5,"state_data":[3]},
-    {"job":6,"skill_index":4,"state":23,"level":10,"state_data":"AQID"}
+    {"enabled":true,"job":6,"skill_index":3,"state":22,"level":5,"state_data":[3]},
+    {"enabled":true,"job":6,"skill_index":4,"state":23,"level":10,"state_data":"AQID"}
   ]
 }`
 	pvf := `[{"job":6,"skill_index":3,"state":22}]`
@@ -162,7 +162,7 @@ func TestSkillDiagnosticsWarnsButKeepsValidWhitelistEntries(t *testing.T) {
 
 func TestSkillDiagnosticsErrorsWhenCatalogsHaveNoIntersection(t *testing.T) {
 	dir := t.TempDir()
-	whitelist := `{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":2,"state":3,"level":10}]}`
+	whitelist := `{"enabled":true,"max_skill_level":70,"skills":[{"enabled":true,"job":1,"skill_index":2,"state":3,"level":10}]}`
 	pvf := `[{"job":1,"skill_index":9,"state":9}]`
 	writeSkillDiagnosticCatalogs(t, dir, whitelist, pvf)
 

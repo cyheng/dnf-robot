@@ -22,7 +22,7 @@ func TestRuntimeFileWatcherRetainsLastValidWebConfig(t *testing.T) {
 	if err := os.WriteFile(paths.PartyCompatibility(), []byte(`{"enabled":true,"account_start":17000000,"account_end":17001000}`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(paths.PartySkills(), []byte(`{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":2,"state":3,"level":1}]}`), 0644); err != nil {
+	if err := os.WriteFile(paths.PartySkills(), []byte(`{"enabled":true,"max_skill_level":70,"skills":[{"enabled":true,"job":1,"skill_index":2,"state":3,"level":1}]}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -57,7 +57,7 @@ func TestRuntimeFileWatcherRetainsLastValidWebConfig(t *testing.T) {
 	if err := os.WriteFile(paths.PartyCompatibility(), []byte(`{"enabled":false,"account_start":17001000,"account_end":17000000}`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(paths.PartySkills(), []byte(`{"enabled":false,"max_skill_level":70,"skills":[{"job":1,"skill_index":2,"state":3,"level":1,"legacy":true}]}`), 0644); err != nil {
+	if err := os.WriteFile(paths.PartySkills(), []byte(`{"enabled":false,"max_skill_level":70,"skills":[{"enabled":true,"job":1,"skill_index":2,"state":3,"level":1,"legacy":true}]}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	poller.CheckNow()

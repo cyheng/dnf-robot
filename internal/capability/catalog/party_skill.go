@@ -31,7 +31,6 @@ type partySkillCatalogEntry struct {
 	ScriptPath string          `json:"script_path,omitempty"`
 	StateData  json.RawMessage `json:"state_data,omitempty"`
 	Risk       int             `json:"risk,omitempty"`
-	enabledSet bool
 }
 
 type partySkillCatalogDocument struct {
@@ -212,11 +211,6 @@ func SyncPartySkillCatalog(path, pvfPath string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		// Old hand-written whitelist entries had no switch. Migrate them to the
-		// safe generated default instead of silently enabling skills.
-		if !entry.enabledSet {
-			entry.Enabled = false
-		}
 		existing[partySkillRuntimeKey(entry.Job, entry.SkillIndex, entry.State, entry.ScriptPath)] = entry
 	}
 
@@ -244,7 +238,6 @@ func SyncPartySkillCatalog(path, pvfPath string) (bool, error) {
 		entry.State = state.State
 		entry.ScriptPath = state.ScriptPath
 		entry.Disabled = false
-		entry.enabledSet = false
 		if strings.TrimSpace(entry.Name) == "" {
 			entry.Name = partySkillDisplayName(state.ScriptPath)
 		}
@@ -342,12 +335,14 @@ func decodePartySkillCatalogEntry(index int, data []byte) (partySkillCatalogEntr
 	if raw.StateData != nil {
 		stateData = append(json.RawMessage(nil), (*raw.StateData)...)
 	}
+	if raw.Enabled == nil {
+		return partySkillCatalogEntry{}, fmt.Errorf("party skill catalog entry %d requires enabled", index)
+	}
 	return partySkillCatalogEntry{
-		ID: raw.ID, Enabled: raw.Enabled == nil || *raw.Enabled, JobLabel: raw.JobLabel,
+		ID: raw.ID, Enabled: *raw.Enabled, JobLabel: raw.JobLabel,
 		Disabled: raw.Disabled, Job: *raw.Job, SkillIndex: *raw.SkillIndex,
 		State: *raw.State, Level: *raw.Level, Name: raw.Name,
 		ScriptPath: raw.ScriptPath, StateData: stateData, Risk: raw.Risk,
-		enabledSet: raw.Enabled != nil,
 	}, nil
 }
 

@@ -23,7 +23,7 @@ func TestRuntimeFileWatcherPublishesValidSnapshotsAndRejectsInvalidEdits(t *test
 		paths.NameTemplates():  `{"common":["Alpha"],"jobs":{}}`,
 		paths.ShoutTemplates(): `{"channel":"world","type":3,"messages":["one"]}`,
 		paths.StoreTitles():    `["Shop A","Shop B"]`,
-		paths.PartySkills():    `{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":2,"state":3,"level":1}]}`,
+		paths.PartySkills():    `{"enabled":true,"max_skill_level":70,"skills":[{"enabled":true,"job":1,"skill_index":2,"state":3,"level":1}]}`,
 	}
 	for path, data := range writes {
 		if err := os.WriteFile(path, []byte(data), 0644); err != nil {
@@ -61,7 +61,7 @@ func TestRuntimeFileWatcherPublishesValidSnapshotsAndRejectsInvalidEdits(t *test
 		paths.NameTemplates():  `{"common":["Beta","Gamma"],"jobs":{}}`,
 		paths.ShoutTemplates(): `{"channel":"world","type":3,"messages":["two","three"]}`,
 		paths.StoreTitles():    `["Shop C","Shop D","Shop E"]`,
-		paths.PartySkills():    `{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":4,"state":5,"level":2}]}`,
+		paths.PartySkills():    `{"enabled":true,"max_skill_level":70,"skills":[{"enabled":true,"job":1,"skill_index":4,"state":5,"level":2}]}`,
 	}
 	for path, data := range updates {
 		if err := os.WriteFile(path, []byte(data), 0644); err != nil {
@@ -106,7 +106,7 @@ func TestRuntimeFileWatcherPublishesValidSnapshotsAndRejectsInvalidEdits(t *test
 	if err := os.WriteFile(paths.StoreTitles(), []byte(`{"broken":`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(paths.PartySkills(), []byte(`{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":0,"state":5,"level":2}]}`), 0644); err != nil {
+	if err := os.WriteFile(paths.PartySkills(), []byte(`{"enabled":true,"max_skill_level":70,"skills":[{"enabled":true,"job":1,"skill_index":0,"state":5,"level":2}]}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	poller.CheckNow()
