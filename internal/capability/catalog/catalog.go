@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -256,58 +257,95 @@ func parseNameTemplates(data []byte) (robottemplate.NameTemplates, error) {
 	if data[0] != '{' {
 		return robottemplate.NameTemplates{}, fmt.Errorf("name template must be an object")
 	}
+	type rawGrow struct {
+		Label string   `json:"label"`
+		Names []string `json:"names"`
+	}
+	type rawJob struct {
+		Label string             `json:"label"`
+		Names []string           `json:"names"`
+		Grows map[string]rawGrow `json:"grows"`
+	}
 	var raw struct {
-		Names     []string `json:"names"`
-		Prefixes  []string `json:"prefixes"`
-		Middles   []string `json:"middles"`
-		Suffixes  []string `json:"suffixes"`
-		Pattern   *string  `json:"pattern"`
-		NumberMin *int     `json:"number_min"`
-		NumberMax *int     `json:"number_max"`
+		Common []string          `json:"common"`
+		Jobs   map[string]rawJob `json:"jobs"`
 	}
 	if err := foundationconfig.DecodeJSONBytes(data, &raw); err != nil {
 		return robottemplate.NameTemplates{}, err
 	}
-	names, err := validateTemplateStrings("names", raw.Names)
+	if raw.Common == nil || raw.Jobs == nil {
+		return robottemplate.NameTemplates{}, fmt.Errorf("name template requires common and jobs")
+	}
+	seenNames := make(map[string]string)
+	common, err := validateNameTemplateStrings("common", raw.Common, seenNames)
 	if err != nil {
 		return robottemplate.NameTemplates{}, err
 	}
-	prefixes, err := validateTemplateStrings("prefixes", raw.Prefixes)
-	if err != nil {
-		return robottemplate.NameTemplates{}, err
-	}
-	middles, err := validateTemplateStrings("middles", raw.Middles)
-	if err != nil {
-		return robottemplate.NameTemplates{}, err
-	}
-	suffixes, err := validateTemplateStrings("suffixes", raw.Suffixes)
-	if err != nil {
-		return robottemplate.NameTemplates{}, err
-	}
-	t := robottemplate.NameTemplates{Names: names, Prefixes: prefixes, Middles: middles, Suffixes: suffixes}
-	composite := raw.Prefixes != nil || raw.Middles != nil || raw.Suffixes != nil || raw.Pattern != nil || raw.NumberMin != nil || raw.NumberMax != nil
-	if composite {
-		if len(t.Prefixes) == 0 || len(t.Middles) == 0 || len(t.Suffixes) == 0 || raw.Pattern == nil || strings.TrimSpace(*raw.Pattern) == "" || raw.NumberMin == nil || raw.NumberMax == nil {
-			return robottemplate.NameTemplates{}, fmt.Errorf("composite name template requires non-empty prefixes, middles, suffixes, pattern, number_min, and number_max")
+	t := robottemplate.NameTemplates{Common: common, Jobs: make(map[int]robottemplate.NamePool, len(raw.Jobs))}
+	seenJobs := make(map[int]string, len(raw.Jobs))
+	for jobKey, jobRaw := range raw.Jobs {
+		job, err := parseNamePoolID("job", jobKey)
+		if err != nil {
+			return robottemplate.NameTemplates{}, err
 		}
-		if strings.TrimSpace(*raw.Pattern) != *raw.Pattern {
-			return robottemplate.NameTemplates{}, fmt.Errorf("name template pattern must not have leading or trailing whitespace")
+		if previous, exists := seenJobs[job]; exists {
+			return robottemplate.NameTemplates{}, fmt.Errorf("job keys %q and %q resolve to duplicate job %d", previous, jobKey, job)
 		}
-		if *raw.NumberMin < 0 || *raw.NumberMax < *raw.NumberMin {
-			return robottemplate.NameTemplates{}, fmt.Errorf("name template number range must be non-negative and ordered")
+		seenJobs[job] = jobKey
+		label := strings.TrimSpace(jobRaw.Label)
+		if label == "" || label != jobRaw.Label {
+			return robottemplate.NameTemplates{}, fmt.Errorf("job %d label must be non-blank without surrounding whitespace", job)
 		}
-		t.Pattern = *raw.Pattern
-		t.NumberMin = *raw.NumberMin
-		t.NumberMax = *raw.NumberMax
+		names, err := validateNameTemplateStrings(fmt.Sprintf("jobs[%d].names", job), jobRaw.Names, seenNames)
+		if err != nil {
+			return robottemplate.NameTemplates{}, err
+		}
+		pool := robottemplate.NamePool{Label: label, Names: names, Grows: make(map[int]robottemplate.NamePool, len(jobRaw.Grows))}
+		seenGrows := make(map[int]string, len(jobRaw.Grows))
+		for growKey, growRaw := range jobRaw.Grows {
+			grow, err := parseNamePoolID("grow", growKey)
+			if err != nil {
+				return robottemplate.NameTemplates{}, fmt.Errorf("job %d: %w", job, err)
+			}
+			if previous, exists := seenGrows[grow]; exists {
+				return robottemplate.NameTemplates{}, fmt.Errorf("job %d grow keys %q and %q resolve to duplicate grow %d", job, previous, growKey, grow)
+			}
+			seenGrows[grow] = growKey
+			growLabel := strings.TrimSpace(growRaw.Label)
+			if growLabel == "" || growLabel != growRaw.Label {
+				return robottemplate.NameTemplates{}, fmt.Errorf("job %d grow %d label must be non-blank without surrounding whitespace", job, grow)
+			}
+			growNames, err := validateNameTemplateStrings(fmt.Sprintf("jobs[%d].grows[%d].names", job, grow), growRaw.Names, seenNames)
+			if err != nil {
+				return robottemplate.NameTemplates{}, err
+			}
+			pool.Grows[grow] = robottemplate.NamePool{Label: growLabel, Names: growNames}
+		}
+		t.Jobs[job] = pool
 	}
-	if len(t.Names) == 0 && !composite {
-		return robottemplate.NameTemplates{}, fmt.Errorf("name template requires names or a complete composite template")
+	if robottemplate.NameCount(t) == 0 {
+		return robottemplate.NameTemplates{}, fmt.Errorf("name template requires at least one name")
 	}
 	return robottemplate.CloneNameTemplates(t), nil
 }
 
+func parseNamePoolID(kind, raw string) (int, error) {
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return 0, fmt.Errorf("%s key %q must be a non-negative integer", kind, raw)
+	}
+	return value, nil
+}
+
 func validateTemplateStrings(field string, values []string) ([]string, error) {
-	seen := make(map[string]struct{}, len(values))
+	return validateStringList(field, values, make(map[string]string), false)
+}
+
+func validateNameTemplateStrings(field string, values []string, seen map[string]string) ([]string, error) {
+	return validateStringList(field, values, seen, true)
+}
+
+func validateStringList(field string, values []string, seen map[string]string, requireGameName bool) ([]string, error) {
 	out := append([]string(nil), values...)
 	for i, value := range out {
 		trimmed := strings.TrimSpace(value)
@@ -317,22 +355,21 @@ func validateTemplateStrings(field string, values []string) ([]string, error) {
 		if trimmed != value {
 			return nil, fmt.Errorf("template %s[%d] must not have leading or trailing whitespace", field, i)
 		}
-		if _, exists := seen[value]; exists {
-			return nil, fmt.Errorf("template %s[%d] duplicates %q", field, i, value)
+		if requireGameName && !robottemplate.FitsGameSlot(value) {
+			return nil, fmt.Errorf("template %s[%d] does not fit the game name slot", field, i)
 		}
-		seen[value] = struct{}{}
+		if previous, exists := seen[value]; exists {
+			return nil, fmt.Errorf("template %s[%d] duplicates %q from %s", field, i, value, previous)
+		}
+		seen[value] = fmt.Sprintf("%s[%d]", field, i)
 	}
 	return out, nil
 }
 
 func defaultNameTemplates() robottemplate.NameTemplates {
 	return robottemplate.NameTemplates{
-		Prefixes:  []string{"Bot", "Star", "Moon", "Sky"},
-		Middles:   []string{"Blade", "Wind", "Light", "Fire"},
-		Suffixes:  []string{"One", "Two", "X", "Z"},
-		Pattern:   "{prefix}{middle}{suffix}{number}",
-		NumberMin: 10,
-		NumberMax: 99,
+		Common: []string{"BotStar", "BotMoon", "BotSky", "BotWind"},
+		Jobs:   map[int]robottemplate.NamePool{},
 	}
 }
 

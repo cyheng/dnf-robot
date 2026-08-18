@@ -20,7 +20,7 @@ func TestRuntimeFileWatcherPublishesValidSnapshotsAndRejectsInvalidEdits(t *test
 	}
 	writes := map[string]string{
 		paths.RobotConfig():    "[auto]\nauto_target_online_count = 20\n",
-		paths.NameTemplates():  `{"names":["Alpha"]}`,
+		paths.NameTemplates():  `{"common":["Alpha"],"jobs":{}}`,
 		paths.ShoutTemplates(): `{"channel":"world","type":3,"messages":["one"]}`,
 		paths.StoreTitles():    `["Shop A","Shop B"]`,
 		paths.PartySkills():    `{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":2,"state":3,"level":1}]}`,
@@ -39,7 +39,7 @@ func TestRuntimeFileWatcherPublishesValidSnapshotsAndRejectsInvalidEdits(t *test
 	if got := manager.loadRobotConfig().AutoTargetOnlineCount; got != 20 {
 		t.Fatalf("initial target=%d, want 20", got)
 	}
-	if got := manager.loadNameTemplates().Names; len(got) != 1 || got[0] != "Alpha" {
+	if got := manager.loadNameTemplates().Common; len(got) != 1 || got[0] != "Alpha" {
 		t.Fatalf("initial names=%v", got)
 	}
 	if got := manager.loadShoutTemplates().Messages; len(got) != 1 || got[0] != "one" {
@@ -58,7 +58,7 @@ func TestRuntimeFileWatcherPublishesValidSnapshotsAndRejectsInvalidEdits(t *test
 
 	updates := map[string]string{
 		paths.RobotConfig():    "[auto]\nauto_target_online_count = 25\n",
-		paths.NameTemplates():  `{"names":["Beta","Gamma"]}`,
+		paths.NameTemplates():  `{"common":["Beta","Gamma"],"jobs":{}}`,
 		paths.ShoutTemplates(): `{"channel":"world","type":3,"messages":["two","three"]}`,
 		paths.StoreTitles():    `["Shop C","Shop D","Shop E"]`,
 		paths.PartySkills():    `{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":4,"state":5,"level":2}]}`,
@@ -72,7 +72,7 @@ func TestRuntimeFileWatcherPublishesValidSnapshotsAndRejectsInvalidEdits(t *test
 	if got := manager.loadRobotConfig().AutoTargetOnlineCount; got != 25 {
 		t.Fatalf("updated target=%d, want 25", got)
 	}
-	if got := manager.loadNameTemplates().Names; len(got) != 2 || got[0] != "Beta" {
+	if got := manager.loadNameTemplates().Common; len(got) != 2 || got[0] != "Beta" {
 		t.Fatalf("updated names=%v", got)
 	}
 	if got := manager.loadShoutTemplates().Messages; len(got) != 2 || got[0] != "two" {
@@ -113,7 +113,7 @@ func TestRuntimeFileWatcherPublishesValidSnapshotsAndRejectsInvalidEdits(t *test
 	if got := manager.loadRobotConfig().AutoTargetOnlineCount; got != 25 {
 		t.Fatalf("invalid edit replaced robot config: target=%d", got)
 	}
-	if got := manager.loadNameTemplates().Names; len(got) != 2 || got[0] != "Beta" {
+	if got := manager.loadNameTemplates().Common; len(got) != 2 || got[0] != "Beta" {
 		t.Fatalf("invalid edit replaced names=%v", got)
 	}
 	if got := manager.loadShoutTemplates().Messages; len(got) != 2 || got[0] != "two" {

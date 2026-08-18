@@ -125,8 +125,8 @@ func (e lifecycleCreateEnv) RobotInnerIP() string {
 	return e.manager.cfg.RobotInnerIP
 }
 
-func (e lifecycleCreateEnv) RobotName(uid int, used map[string]struct{}, rc robotconfig.RuntimeConfig) string {
-	return e.manager.robotName(uid, used, rc)
+func (e lifecycleCreateEnv) RobotName(uid, job, grow int, used map[string]struct{}, rc robotconfig.RuntimeConfig) string {
+	return e.manager.robotName(uid, job, grow, used, rc)
 }
 
 func (e lifecycleCreateEnv) UpsertDummy(info robotcap.Info, innerIP string) error {

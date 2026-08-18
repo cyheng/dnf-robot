@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	robotconfig "robot/internal/capability/robotconfig"
 )
 
 func TestSafeShoutMessage(t *testing.T) {
@@ -44,18 +46,23 @@ func TestPrepareShoutSeparatesLocalAndWorld(t *testing.T) {
 	}
 }
 
-func TestRenderName(t *testing.T) {
+func TestAllocateNameUsesGrowJobAndCommonPoolsInOrder(t *testing.T) {
 	tpl := NameTemplates{
-		Prefixes:  []string{"Bot"},
-		Middles:   []string{"Name"},
-		Suffixes:  []string{"X"},
-		Pattern:   "{prefix}{middle}{suffix}{uid_tail}",
-		NumberMin: 1,
-		NumberMax: 9,
+		Common: []string{"Common"},
+		Jobs: map[int]NamePool{1: {
+			Names: []string{"Job"},
+			Grows: map[int]NamePool{2: {Names: []string{"Grow"}}},
+		}},
 	}
-	got := RenderName(tpl, 123, 0, nil, nil)
-	if got != "BotNameX00123" {
-		t.Fatalf("name got %q want BotNameX00123", got)
+	used := map[string]struct{}{}
+	if got := AllocateName(123, 1, 2, used, robotconfig.RuntimeConfig{}, tpl, nil, nil); got != "Grow" {
+		t.Fatalf("first name=%q want Grow", got)
+	}
+	if got := AllocateName(124, 1, 2, used, robotconfig.RuntimeConfig{}, tpl, nil, nil); got != "Job" {
+		t.Fatalf("second name=%q want Job", got)
+	}
+	if got := AllocateName(125, 1, 2, used, robotconfig.RuntimeConfig{}, tpl, nil, nil); got != "Common" {
+		t.Fatalf("third name=%q want Common", got)
 	}
 }
 

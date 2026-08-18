@@ -359,7 +359,7 @@ func (m *RobotManager) reloadNameTemplates(path string) error {
 		return err
 	}
 	m.nameTemplateSnapshot.Store(&tpl)
-	robotLogf("[RuntimeFile] applied name_templates path=%s names=%d\n", path, len(tpl.Names))
+	robotLogf("[RuntimeFile] applied name_templates path=%s names=%d jobs=%d\n", path, robottemplate.NameCount(tpl), len(tpl.Jobs))
 	return nil
 }
 

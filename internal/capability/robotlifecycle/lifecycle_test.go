@@ -36,6 +36,9 @@ func TestCreatorCapsCountAndCreatesRobots(t *testing.T) {
 	if robots[0].UID != 17000000 || robots[0].CID != 900000 || robots[0].Port != 10011 {
 		t.Fatalf("first robot got %+v", robots[0])
 	}
+	if env.lastNameJob != 1 || env.lastNameGrow != 2 {
+		t.Fatalf("name allocation job/grow=%d/%d want=1/2", env.lastNameJob, env.lastNameGrow)
+	}
 }
 
 func TestCreatorRejectsGuardInsideRobotSegmentBeforeAllocation(t *testing.T) {
@@ -258,6 +261,8 @@ type testCreateEnv struct {
 	prepareErr        error
 	prepared          bool
 	allocated         bool
+	lastNameJob       int
+	lastNameGrow      int
 }
 
 type testCreateBatchEnv struct {
@@ -377,7 +382,9 @@ func (e *testCreateEnv) RobotGamePort() int { return 10011 }
 
 func (e *testCreateEnv) RobotInnerIP() string { return "127.0.0.1" }
 
-func (e *testCreateEnv) RobotName(uid int, used map[string]struct{}, rc robotconfig.RuntimeConfig) string {
+func (e *testCreateEnv) RobotName(uid, job, grow int, used map[string]struct{}, rc robotconfig.RuntimeConfig) string {
+	e.lastNameJob = job
+	e.lastNameGrow = grow
 	return "robot"
 }
 

@@ -2,7 +2,6 @@ package robottemplate
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,14 +15,15 @@ type ShoutTemplates struct {
 	Messages []string `json:"messages"`
 }
 
+type NamePool struct {
+	Label string           `json:"label"`
+	Names []string         `json:"names"`
+	Grows map[int]NamePool `json:"grows,omitempty"`
+}
+
 type NameTemplates struct {
-	Names     []string `json:"names"`
-	Prefixes  []string `json:"prefixes"`
-	Middles   []string `json:"middles"`
-	Suffixes  []string `json:"suffixes"`
-	Pattern   string   `json:"pattern"`
-	NumberMin int      `json:"number_min"`
-	NumberMax int      `json:"number_max"`
+	Common []string         `json:"common"`
+	Jobs   map[int]NamePool `json:"jobs"`
 }
 
 func CloneShoutTemplates(t ShoutTemplates) ShoutTemplates {
@@ -32,11 +32,38 @@ func CloneShoutTemplates(t ShoutTemplates) ShoutTemplates {
 }
 
 func CloneNameTemplates(t NameTemplates) NameTemplates {
-	t.Names = append([]string(nil), t.Names...)
-	t.Prefixes = append([]string(nil), t.Prefixes...)
-	t.Middles = append([]string(nil), t.Middles...)
-	t.Suffixes = append([]string(nil), t.Suffixes...)
+	t.Common = append([]string(nil), t.Common...)
+	if t.Jobs != nil {
+		jobs := make(map[int]NamePool, len(t.Jobs))
+		for job, pool := range t.Jobs {
+			jobs[job] = cloneNamePool(pool)
+		}
+		t.Jobs = jobs
+	}
 	return t
+}
+
+func cloneNamePool(pool NamePool) NamePool {
+	pool.Names = append([]string(nil), pool.Names...)
+	if pool.Grows != nil {
+		grows := make(map[int]NamePool, len(pool.Grows))
+		for grow, child := range pool.Grows {
+			grows[grow] = cloneNamePool(child)
+		}
+		pool.Grows = grows
+	}
+	return pool
+}
+
+func NameCount(t NameTemplates) int {
+	count := len(t.Common)
+	for _, job := range t.Jobs {
+		count += len(job.Names)
+		for _, grow := range job.Grows {
+			count += len(grow.Names)
+		}
+	}
+	return count
 }
 
 func SafeShoutMessage(msg string) string {
@@ -72,53 +99,22 @@ func PrepareShout(msg string, world bool) (int, string, string) {
 	return 3, "local", msg
 }
 
-func RenderName(t NameTemplates, uid, attempt int, randomString func([]string, string) string, randBetween func(int, int) int) string {
-	if len(t.Names) > 0 {
-		idx := 0
-		if randBetween != nil {
-			idx = randBetween(0, len(t.Names)-1)
-		}
-		name := strings.TrimSpace(t.Names[idx])
-		if attempt >= len(t.Names)*2 {
-			name += fmt.Sprintf("%05d", uid%100000)
-		}
-		return name
-	}
-	if randomString == nil {
-		randomString = firstString
-	}
-	if randBetween == nil {
-		randBetween = firstInt
-	}
-	prefix := randomString(t.Prefixes, "Bot")
-	middle := randomString(t.Middles, "Name")
-	suffix := randomString(t.Suffixes, "X")
-	if t.Pattern == "" {
-		t.Pattern = "{prefix}{middle}{suffix}{number}"
-	}
-	if t.NumberMax < t.NumberMin {
-		t.NumberMin, t.NumberMax = t.NumberMax, t.NumberMin
-	}
-	if t.NumberMin == 0 && t.NumberMax == 0 {
-		t.NumberMin, t.NumberMax = 10, 99
-	}
-	number := randBetween(t.NumberMin, t.NumberMax)
-	name := strings.ReplaceAll(t.Pattern, "{prefix}", prefix)
-	name = strings.ReplaceAll(name, "{middle}", middle)
-	name = strings.ReplaceAll(name, "{suffix}", suffix)
-	name = strings.ReplaceAll(name, "{number}", strconv.Itoa(number))
-	name = strings.ReplaceAll(name, "{uid}", strconv.Itoa(uid))
-	name = strings.ReplaceAll(name, "{uid_tail}", fmt.Sprintf("%05d", uid%100000))
-	name = strings.ReplaceAll(name, "{attempt}", strconv.Itoa(attempt))
-	if !strings.Contains(t.Pattern, "{uid}") && !strings.Contains(t.Pattern, "{uid_tail}") {
-		name += fmt.Sprintf("%05d", uid%100000)
-	}
-	return name
-}
-
-func AllocateName(uid int, used map[string]struct{}, rc robotconfig.RuntimeConfig, tpl NameTemplates, exists func(string) bool, randomString func([]string, string) string, randBetween func(int, int) int) string {
+func AllocateName(uid, job, grow int, used map[string]struct{}, rc robotconfig.RuntimeConfig, tpl NameTemplates, exists func(string) bool, randBetween func(int, int) int) string {
 	if used == nil {
 		used = make(map[string]struct{})
+	}
+	if pool, ok := tpl.Jobs[job]; ok {
+		if child, ok := pool.Grows[grow]; ok {
+			if name, ok := allocateFromPool(child.Names, used, exists, randBetween); ok {
+				return name
+			}
+		}
+		if name, ok := allocateFromPool(pool.Names, used, exists, randBetween); ok {
+			return name
+		}
+	}
+	if name, ok := allocateFromPool(tpl.Common, used, exists, randBetween); ok {
+		return name
 	}
 	if rc.NameASCIIFallback {
 		prefix := rc.NameASCIIPrefix
@@ -133,21 +129,29 @@ func AllocateName(uid int, used map[string]struct{}, rc robotconfig.RuntimeConfi
 		}
 	}
 	for attempt := 0; attempt < 1000; attempt++ {
-		name := RenderName(tpl, uid, attempt, randomString, randBetween)
-		if !FitsGameSlot(name) {
-			continue
-		}
-		if reserveName(name, used, exists) {
-			return name
-		}
-	}
-	for attempt := 0; attempt < 1000; attempt++ {
 		name := fmt.Sprintf("Robot%d%03d", uid%100000, attempt)
 		if reserveName(name, used, exists) {
 			return name
 		}
 	}
 	return fmt.Sprintf("Robot%d", time.Now().UnixNano()%1000000)
+}
+
+func allocateFromPool(names []string, used map[string]struct{}, exists func(string) bool, randBetween func(int, int) int) (string, bool) {
+	if len(names) == 0 {
+		return "", false
+	}
+	start := 0
+	if randBetween != nil {
+		start = randBetween(0, len(names)-1)
+	}
+	for offset := range names {
+		name := strings.TrimSpace(names[(start+offset)%len(names)])
+		if reserveName(name, used, exists) {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 func reserveName(name string, used map[string]struct{}, exists func(string) bool) bool {
@@ -181,15 +185,4 @@ func NameForEncoding(name, encoding string) interface{} {
 	default:
 		return name
 	}
-}
-
-func firstString(vals []string, fallback string) string {
-	if len(vals) == 0 {
-		return fallback
-	}
-	return vals[0]
-}
-
-func firstInt(min, max int) int {
-	return min
 }

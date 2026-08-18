@@ -23,7 +23,7 @@ func TestEmptyCatalogDirectoryNeverReadsWorkingDirectory(t *testing.T) {
 
 	files := map[string]string{
 		"robot_shout_templates.json": `{"channel":"local","type":3,"messages":["cwd-shout"]}`,
-		"robot_name_templates.json":  `{"names":["cwd-name"]}`,
+		"robot_name_templates.json":  `{"common":["cwd-name"],"jobs":{}}`,
 		"map_catalog.json":           `[{"village":1,"area":0}]`,
 		"equipment_catalog.json":     `[{"id":123}]`,
 		"stackable_catalog.json":     `[{"id":456}]`,
@@ -40,7 +40,7 @@ func TestEmptyCatalogDirectoryNeverReadsWorkingDirectory(t *testing.T) {
 		t.Fatalf("empty directory read shout template from cwd: %+v", shouts)
 	}
 	names := NameTemplates("")
-	if len(names.Names) != 0 || len(names.Prefixes) == 0 {
+	if len(names.Common) == 0 || names.Common[0] != "BotStar" {
 		t.Fatalf("empty directory read name template from cwd: %+v", names)
 	}
 	if maps := ViewMaps(""); len(maps) != 0 {

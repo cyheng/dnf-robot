@@ -12,11 +12,11 @@ import (
 	"robot/internal/shared"
 )
 
-func (m *RobotManager) robotName(uid int, used map[string]struct{}, rc robotconfig.RuntimeConfig) string {
-	return robottemplate.AllocateName(uid, used, rc, m.loadNameTemplates(), func(dbName string) bool {
+func (m *RobotManager) robotName(uid, job, grow int, used map[string]struct{}, rc robotconfig.RuntimeConfig) string {
+	return robottemplate.AllocateName(uid, job, grow, used, rc, m.loadNameTemplates(), func(dbName string) bool {
 		exists, _ := m.schemaRepo().CharacterNameExists(dbName)
 		return exists
-	}, m.randomString, m.randBetween)
+	}, m.randBetween)
 }
 
 func (m *RobotManager) CreateRobots(req robotcap.CreateRequest) ([]robotcap.Info, error) {

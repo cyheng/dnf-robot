@@ -75,37 +75,30 @@ func TestShoutTemplatesCacheRefreshesMissingFileAndReturnsCopies(t *testing.T) {
 func TestNameTemplatesCacheRefreshesAndReusesUnchangedValue(t *testing.T) {
 	dir := t.TempDir()
 	missing := NameTemplates(dir)
-	if len(missing.Prefixes) == 0 || missing.Pattern == "" {
+	if len(missing.Common) == 0 {
 		t.Fatalf("missing fallback = %+v", missing)
 	}
 
 	path := filepath.Join(dir, "robot_name_templates.json")
-	writeCatalogJSON(t, path, map[string]interface{}{"names": []string{"first", "second"}})
+	writeCatalogJSON(t, path, map[string]interface{}{"common": []string{"first", "second"}, "jobs": map[string]interface{}{}})
 	expireCatalogCacheEntry(t, &nameFiles, path)
 	loaded := NameTemplates(dir)
-	if len(loaded.Names) != 2 || loaded.Names[0] != "first" {
+	if len(loaded.Common) != 2 || loaded.Common[0] != "first" {
 		t.Fatalf("loaded templates = %+v", loaded)
 	}
-	if again := NameTemplates(dir); len(again.Names) != 2 || again.Names[0] != "first" {
+	if again := NameTemplates(dir); len(again.Common) != 2 || again.Common[0] != "first" {
 		t.Fatalf("cached templates = %+v", again)
 	}
 
-	writeCatalogJSON(t, path, map[string]interface{}{
-		"prefixes":   []string{"new"},
-		"middles":    []string{"middle"},
-		"suffixes":   []string{"suffix"},
-		"pattern":    "{prefix}{number}",
-		"number_min": 1,
-		"number_max": 2,
-	})
+	writeCatalogJSON(t, path, map[string]interface{}{"common": []string{"new"}, "jobs": map[string]interface{}{}})
 	expireCatalogCacheEntry(t, &nameFiles, path)
 	refreshed := NameTemplates(dir)
-	if len(refreshed.Prefixes) != 1 || refreshed.Prefixes[0] != "new" || refreshed.Pattern != "{prefix}{number}" {
+	if len(refreshed.Common) != 1 || refreshed.Common[0] != "new" {
 		t.Fatalf("refreshed templates = %+v", refreshed)
 	}
 	writeCatalogJSON(t, path, []string{"legacy-array"})
 	expireCatalogCacheEntry(t, &nameFiles, path)
-	if retained := NameTemplates(dir); len(retained.Prefixes) != 1 || retained.Prefixes[0] != "new" || retained.Pattern != "{prefix}{number}" {
+	if retained := NameTemplates(dir); len(retained.Common) != 1 || retained.Common[0] != "new" {
 		t.Fatalf("invalid edit replaced name snapshot: %+v", retained)
 	}
 }
@@ -134,12 +127,13 @@ func TestRuntimeTemplatesRejectLegacyArraysUnknownFieldsAndInvalidRanges(t *test
 
 	for _, raw := range []string{
 		`["legacy"]`,
-		`{"names":["ok"],"legacy":true}`,
-		`{"names":["ok","ok"]}`,
-		`{"names":[" padded "]}`,
-		`{"prefixes":["A"],"middles":["B"],"suffixes":["C"],"pattern":"{prefix}","number_min":2,"number_max":1}`,
-		`{"prefixes":["A"],"middles":["B"],"suffixes":["C"],"pattern":" {prefix}","number_min":1,"number_max":2}`,
-		`{"prefixes":["A"],"pattern":"{prefix}"}`,
+		`{"names":["ok"]}`,
+		`{"common":["ok"],"jobs":{},"legacy":true}`,
+		`{"common":["ok","ok"],"jobs":{}}`,
+		`{"common":[" padded "],"jobs":{}}`,
+		`{"common":[],"jobs":{"bad":{"label":"Bad","names":[],"grows":{}}}}`,
+		`{"common":[],"jobs":{"1":{"label":"","names":[],"grows":{}}}}`,
+		`{"common":["same"],"jobs":{"1":{"label":"Job","names":["same"],"grows":{}}}}`,
 	} {
 		if err := os.WriteFile(namePath, []byte(raw), 0644); err != nil {
 			t.Fatal(err)
@@ -155,11 +149,15 @@ func TestRuntimeTemplatesRejectLegacyArraysUnknownFieldsAndInvalidRanges(t *test
 	if _, err := ReadShoutTemplates(shoutPath); err != nil {
 		t.Fatalf("canonical shout template rejected: %v", err)
 	}
-	if err := os.WriteFile(namePath, []byte(`{"names":["ok"]}`), 0644); err != nil {
+	if err := os.WriteFile(namePath, []byte(`{"common":["ok"],"jobs":{"1":{"label":"Job","names":[],"grows":{"2":{"label":"Grow","names":["grow"]}}}}}`), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ReadNameTemplates(namePath); err != nil {
+	parsedNames, err := ReadNameTemplates(namePath)
+	if err != nil {
 		t.Fatalf("canonical name template rejected: %v", err)
+	}
+	if parsedNames.Jobs[1].Label != "Job" || parsedNames.Jobs[1].Grows[2].Label != "Grow" || parsedNames.Jobs[1].Grows[2].Names[0] != "grow" {
+		t.Fatalf("canonical name pools parsed incorrectly: %+v", parsedNames)
 	}
 }
 
@@ -365,12 +363,8 @@ func BenchmarkShoutTemplatesReadAndDecode(b *testing.B) {
 func BenchmarkNameTemplatesCached(b *testing.B) {
 	dir := b.TempDir()
 	writeCatalogJSON(b, filepath.Join(dir, "robot_name_templates.json"), robottemplate.NameTemplates{
-		Prefixes:  []string{"Alpha", "Beta", "Gamma", "Delta"},
-		Middles:   []string{"Blade", "Wind", "Light", "Fire"},
-		Suffixes:  []string{"One", "Two", "X", "Z"},
-		Pattern:   "{prefix}{middle}{suffix}{number}",
-		NumberMin: 10,
-		NumberMax: 99,
+		Common: []string{"Alpha", "Beta", "Gamma", "Delta"},
+		Jobs:   map[int]robottemplate.NamePool{},
 	})
 	_ = NameTemplates(dir)
 

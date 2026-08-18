@@ -43,7 +43,7 @@ type CreateEnv interface {
 	RandBetween(min, max int) int
 	RobotGamePort() int
 	RobotInnerIP() string
-	RobotName(uid int, used map[string]struct{}, rc robotconfig.RuntimeConfig) string
+	RobotName(uid, job, grow int, used map[string]struct{}, rc robotconfig.RuntimeConfig) string
 	UpsertDummy(info robotcap.Info, innerIP string) error
 }
 
@@ -129,13 +129,15 @@ func (c Creator) Create(req robotcap.CreateRequest) ([]robotcap.Info, error) {
 			}
 			return nil, fmt.Errorf("configured jobs %v have no PVF weapon support at level %d", jobs, levels[i])
 		}
+		job := env.RandomFrom(levelJobs)
+		grow := env.RandomFrom(rc.GrowTypes)
 		info := robotcap.Info{
 			UID:     allocation.UIDs[i],
 			CID:     allocation.FirstCID + i,
-			Name:    env.RobotName(allocation.UIDs[i], usedNames, rc),
+			Name:    env.RobotName(allocation.UIDs[i], job, grow, usedNames, rc),
 			Level:   levels[i],
-			Job:     env.RandomFrom(levelJobs),
-			Grow:    env.RandomFrom(rc.GrowTypes),
+			Job:     job,
+			Grow:    grow,
 			Port:    env.RobotGamePort(),
 			Village: rc.SpawnFallbackVillage,
 			Area:    rc.SpawnArea,
