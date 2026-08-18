@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/rand"
 	robotcap "robot/internal/capability/robot"
 	robotconfig "robot/internal/capability/robotconfig"
@@ -111,7 +112,7 @@ func (p Preparer) EnsureInventoryAndStall(info robotcap.Info, rc robotconfig.Run
 		env.Logf("[StorePrepare] uid=%d cid=%d store_plan=%s inventory_found=0\n", info.UID, info.CID, plan.Name)
 		return nil
 	}
-	assignStorePoolPrices(env, rc, stallItems, nil)
+	assignStorePoolPrices(env, rc, stallItems, nil, nil)
 	title := env.StoreTitle(info.UID, rc)
 	stallResult, err := env.ReplaceStoreStall(info.UID, title, stallItems)
 	if err != nil {
@@ -137,6 +138,7 @@ func (p Preparer) preparePoolInventoryAndStall(info robotcap.Info, rc robotconfi
 
 	materials, equipment := p.Pool.Draw(info.UID)
 	stallItems := make([]StallItem, 0, len(materials)+len(equipment))
+	pricedEquipment := make([]PoolEntry, 0, len(equipment))
 	materialIndex := 0
 	for _, entry := range materials {
 		rawIndex := rc.StoreMaterialStartBox + materialIndex
@@ -156,12 +158,13 @@ func (p Preparer) preparePoolInventoryAndStall(info robotcap.Info, rc robotconfi
 		}
 		copy(invRaw[rawIndex*61:(rawIndex+1)*61], entry.SlotBytes[:])
 		stallItems = append(stallItems, StallItem{ItemID: entry.Item.ID, Count: 1})
+		pricedEquipment = append(pricedEquipment, entry)
 	}
 	if len(stallItems) == 0 {
 		env.Logf("[StorePrepare] uid=%d cid=%d pool_empty=1\n", info.UID, info.CID)
 		return nil
 	}
-	assignStorePoolPrices(env, rc, stallItems[:materialRows], stallItems[materialRows:])
+	assignStorePoolPrices(env, rc, stallItems[:materialRows], stallItems[materialRows:], pricedEquipment)
 	if err := env.SaveInventory(info.CID, rc.InventoryCapacity, invRaw); err != nil {
 		return err
 	}
@@ -195,9 +198,9 @@ func clearInventoryRawRange(raw []byte, start, count int) {
 	}
 }
 
-func assignStorePoolPrices(env PreparationEnv, rc robotconfig.RuntimeConfig, materials, equipment []StallItem) {
+func assignStorePoolPrices(env PreparationEnv, rc robotconfig.RuntimeConfig, materials, equipment []StallItem, equipmentEntries []PoolEntry) {
 	assignStorePrices(env, materials, rc.StoreMaterialPriceMin, rc.StoreMaterialPriceMax)
-	assignStorePrices(env, equipment, rc.StoreEquipmentPriceMin, rc.StoreEquipmentPriceMax)
+	assignStoreEquipmentPrices(equipment, equipmentEntries, rc.StoreEquipmentPriceMin, rc.StoreEquipmentPriceMax)
 
 	totalPrice := storeItemsTotalPrice(materials) + storeItemsTotalPrice(equipment)
 	if totalPrice <= StoreTotalPriceLimit {
@@ -205,6 +208,56 @@ func assignStorePoolPrices(env PreparationEnv, rc robotconfig.RuntimeConfig, mat
 	}
 	scaleStorePrices(materials, totalPrice)
 	scaleStorePrices(equipment, totalPrice)
+}
+
+func assignStoreEquipmentPrices(items []StallItem, entries []PoolEntry, minPrice, maxPrice int) {
+	for index := range items {
+		price := minPrice
+		if index < len(entries) {
+			entry := entries[index]
+			price = storeEquipmentPrice(entry.Item.Level, entry.Item.Rarity, int(entry.SlotBytes[6]), minPrice, maxPrice)
+		}
+		if price <= 0 {
+			price = 1
+		}
+		items[index].Price = price
+	}
+}
+
+func storeEquipmentPrice(level, rarity, upgrade, minPrice, maxPrice int) int {
+	if minPrice <= 0 {
+		minPrice = 1
+	}
+	if maxPrice <= minPrice {
+		return minPrice
+	}
+	levelScore := clampStorePriceScore(float64(level) / 70)
+	rarityScore := clampStorePriceScore(float64(rarity) / 5)
+	effectiveUpgrade := upgrade
+	if effectiveUpgrade < 0 {
+		effectiveUpgrade = 0
+	}
+	if upgrade > 10 {
+		riskLevels := upgrade - 10
+		effectiveUpgrade += riskLevels * riskLevels
+	}
+	upgradeScore := clampStorePriceScore(float64(effectiveUpgrade) / 22)
+	quality := levelScore*0.35 + rarityScore*0.40 + upgradeScore*0.25
+	price := float64(minPrice) * math.Pow(float64(maxPrice)/float64(minPrice), quality)
+	if price >= float64(maxPrice) {
+		return maxPrice
+	}
+	return int(price)
+}
+
+func clampStorePriceScore(value float64) float64 {
+	if value < 0 {
+		return 0
+	}
+	if value > 1 {
+		return 1
+	}
+	return value
 }
 
 func assignStorePrices(env PreparationEnv, items []StallItem, minPrice, maxPrice int) {

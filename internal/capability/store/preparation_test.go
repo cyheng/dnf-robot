@@ -124,7 +124,7 @@ func TestStorePoolPricesUseSeparateMaterialAndEquipmentRanges(t *testing.T) {
 		StoreEquipmentPriceMin: 500000,
 		StoreEquipmentPriceMax: 1000000,
 	}
-	assignStorePoolPrices(env, rc, materials, equipment)
+	assignStorePoolPrices(env, rc, materials, equipment, nil)
 	if materials[0].Price != 10 || equipment[0].Price != 500000 {
 		t.Fatalf("prices material=%d equipment=%d", materials[0].Price, equipment[0].Price)
 	}
@@ -140,12 +140,64 @@ func TestStorePoolPricesScaleAllRowsWhenWholeDisplayExceedsLimit(t *testing.T) {
 		StoreEquipmentPriceMin: 2000000,
 		StoreEquipmentPriceMax: 2000000,
 	}
-	assignStorePoolPrices(env, rc, materials, equipment)
+	assignStorePoolPrices(env, rc, materials, equipment, nil)
 	if total := storeItemsTotalPrice(materials) + storeItemsTotalPrice(equipment); total > StoreTotalPriceLimit {
 		t.Fatalf("whole store total=%d exceeds limit=%d", total, StoreTotalPriceLimit)
 	}
 	if difference := equipment[0].Price - 2*materials[0].Price; difference < -1 || difference > 1 {
 		t.Fatalf("proportional prices material=%d equipment=%d", materials[0].Price, equipment[0].Price)
+	}
+}
+
+func TestStoreEquipmentPriceUsesLevelRarityAndUpgrade(t *testing.T) {
+	const minPrice, maxPrice = 500000, 1000000
+	base := storeEquipmentPrice(1, 0, 0, minPrice, maxPrice)
+	highLevel := storeEquipmentPrice(70, 0, 0, minPrice, maxPrice)
+	highRarity := storeEquipmentPrice(1, 5, 0, minPrice, maxPrice)
+	highUpgrade := storeEquipmentPrice(1, 0, 13, minPrice, maxPrice)
+	if highLevel <= base || highRarity <= base || highUpgrade <= base {
+		t.Fatalf("prices base=%d level=%d rarity=%d upgrade=%d", base, highLevel, highRarity, highUpgrade)
+	}
+	if got := storeEquipmentPrice(70, 5, 13, minPrice, maxPrice); got != maxPrice {
+		t.Fatalf("maximum quality price=%d want=%d", got, maxPrice)
+	}
+}
+
+func TestStoreEquipmentPriceAddsUpgradeRiskPremiumAboveTen(t *testing.T) {
+	const minPrice, maxPrice = 500000, 1000000
+	price10 := storeEquipmentPrice(35, 2, 10, minPrice, maxPrice)
+	price11 := storeEquipmentPrice(35, 2, 11, minPrice, maxPrice)
+	price12 := storeEquipmentPrice(35, 2, 12, minPrice, maxPrice)
+	if price11 <= price10 || price12-price11 <= price11-price10 {
+		t.Fatalf("upgrade prices +10=%d +11=%d +12=%d", price10, price11, price12)
+	}
+}
+
+func TestStoreEquipmentPriceClampsInputsAndRange(t *testing.T) {
+	if got := storeEquipmentPrice(-10, -2, -1, 500000, 1000000); got != 500000 {
+		t.Fatalf("minimum price=%d want=500000", got)
+	}
+	if got := storeEquipmentPrice(999, 99, 255, 500000, 1000000); got != 1000000 {
+		t.Fatalf("clamped maximum price=%d want=1000000", got)
+	}
+	if got := storeEquipmentPrice(70, 5, 13, 900, 800); got != 900 {
+		t.Fatalf("invalid range price=%d want=900", got)
+	}
+}
+
+func TestStorePoolPricesUseActualEquipmentMetadata(t *testing.T) {
+	env := testPreparationEnv{}
+	equipment := []StallItem{{Count: 1}, {Count: 1}}
+	entries := []PoolEntry{
+		{Item: shared.EquipmentCatalogItem{Level: 1, Rarity: 0}},
+		{Item: shared.EquipmentCatalogItem{Level: 70, Rarity: 5}},
+	}
+	entries[0].SlotBytes[6] = 0
+	entries[1].SlotBytes[6] = 13
+	rc := robotconfig.RuntimeConfig{StoreEquipmentPriceMin: 500000, StoreEquipmentPriceMax: 1000000}
+	assignStorePoolPrices(env, rc, nil, equipment, entries)
+	if equipment[0].Price != storeEquipmentPrice(1, 0, 0, 500000, 1000000) || equipment[1].Price != 1000000 {
+		t.Fatalf("equipment prices=%+v", equipment)
 	}
 }
 
