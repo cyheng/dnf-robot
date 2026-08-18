@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -223,5 +224,100 @@ func TestSetPartySkillCatalogEnabledRejectsInvalidEnabledSnapshot(t *testing.T) 
 	}
 	if report.Enabled {
 		t.Fatal("failed enable changed the file")
+	}
+}
+
+func TestSyncPartySkillCatalogBuildsSwitchesFromPVF(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "party_skill_catalog.json")
+	pvfPath := filepath.Join(dir, "skill_state_catalog.json")
+	initial := `{
+  "enabled": true,
+  "max_skill_level": 70,
+  "skills": [
+    {"job":1,"skill_index":2,"state":3,"level":5,"name":"verified","script_path":"sqr/fighter/verified.nut","state_data":[3],"risk":1,"enabled":true},
+    {"job":9,"skill_index":9,"state":9,"level":1,"name":"removed","enabled":true}
+  ]
+}`
+	pvf := `[
+  {"job":1,"skill_index":2,"state":3,"script_path":"sqr/fighter/verified.nut"},
+  {"job":2,"skill_index":4,"state":5,"script_path":"sqr/gunner/newskill.nut"}
+]`
+	if err := os.WriteFile(path, []byte(initial), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pvfPath, []byte(pvf), 0644); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := SyncPartySkillCatalog(path, pvfPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Fatal("synchronization did not update the catalog")
+	}
+	report, err := ReadPartySkillCatalog(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Enabled || report.SourceCount != 2 || len(report.Entries) != 1 {
+		t.Fatalf("synced report = %+v", report)
+	}
+	entry := report.Entries[0]
+	if entry.Job != 1 || entry.SkillIndex != 2 || entry.Name != "verified" || entry.Level != 5 || entry.Risk != 1 || !bytes.Equal(entry.StateData, []byte{3, 0, 0}) {
+		t.Fatalf("preserved entry = %+v", entry)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		Skills []struct {
+			ID       string `json:"id"`
+			Enabled  bool   `json:"enabled"`
+			JobLabel string `json:"job_label"`
+			Name     string `json:"name"`
+		} `json:"skills"`
+	}
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatal(err)
+	}
+	if len(document.Skills) != 2 {
+		t.Fatalf("generated switches = %+v", document.Skills)
+	}
+	if document.Skills[0].ID == "" || document.Skills[0].JobLabel == "" {
+		t.Fatalf("generated switch metadata missing = %+v", document.Skills)
+	}
+	if document.Skills[1].Enabled {
+		t.Fatalf("new switch unexpectedly enabled = %+v", document.Skills[1])
+	}
+	changed, err = SyncPartySkillCatalog(path, pvfPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed {
+		t.Fatal("second synchronization was not idempotent")
+	}
+}
+
+func TestSyncPartySkillCatalogMigratesLegacyEntriesToDisabled(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "party_skill_catalog.json")
+	pvfPath := filepath.Join(dir, "skill_state_catalog.json")
+	if err := os.WriteFile(path, []byte(`{"enabled":true,"max_skill_level":70,"skills":[{"job":1,"skill_index":2,"state":3,"level":1}]}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pvfPath, []byte(`[{"job":1,"skill_index":2,"state":3,"script_path":"sqr/fighter/skill.nut"}]`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SyncPartySkillCatalog(path, pvfPath); err != nil {
+		t.Fatal(err)
+	}
+	report, err := ReadPartySkillCatalog(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Entries) != 0 || report.SwitchOffCount != 1 {
+		t.Fatalf("legacy entry was not migrated off: %+v", report)
 	}
 }

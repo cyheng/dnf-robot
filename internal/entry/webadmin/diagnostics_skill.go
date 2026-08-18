@@ -71,7 +71,7 @@ func partySkillWhitelistCheck(path string, report catalog.PartySkillCatalogRepor
 		Name: filepath.Base(path), Status: status, Message: message,
 		Observed: map[string]interface{}{
 			"path": path, "enabled": report.Enabled, "source_count": report.SourceCount, "valid_count": len(report.Entries), "by_job": byJob,
-			"invalid_count": len(report.Issues), "disabled_count": report.DisabledCount, "over_level_count": report.OverLevelCount,
+			"invalid_count": len(report.Issues), "switch_off_count": report.SwitchOffCount, "disabled_count": report.DisabledCount, "over_level_count": report.OverLevelCount,
 			"configured_max_level": report.ConfiguredMaxSkillLevel, "effective_max_level": report.EffectiveMaxSkillLevel,
 		},
 	}

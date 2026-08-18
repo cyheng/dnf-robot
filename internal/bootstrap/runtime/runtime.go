@@ -38,12 +38,17 @@ func Init(cfg *config.SysConfig) error {
 	if err := ensureConfigRuntimeFiles(paths); err != nil {
 		return err
 	}
-	if err := catalog.LoadPartySkills(paths.Templates); err != nil {
-		fmt.Printf("[Runtime] party skill catalog unavailable: %v\n", err)
-	}
 	keypair.EnsureRuntimeKeypair(cfg)
 	if err := pvf.EnsureExports(cfg.DFGameR, paths.PVF, paths.Temp); err != nil {
 		return err
+	}
+	if changed, err := catalog.SyncPartySkillCatalog(paths.PartySkills(), paths.PVFSkillStates()); err != nil {
+		fmt.Printf("[Runtime] party skill switches unavailable: %v\n", err)
+	} else if changed {
+		fmt.Printf("[Runtime] party skill switches synchronized from current PVF\n")
+	}
+	if err := catalog.LoadPartySkills(paths.Templates); err != nil {
+		fmt.Printf("[Runtime] party skill catalog unavailable: %v\n", err)
 	}
 	if err := updateRuntimeManifest(cfg); err != nil {
 		fmt.Printf("[Runtime] self-check manifest update skipped: %v\n", err)

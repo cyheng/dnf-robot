@@ -1,10 +1,14 @@
 package catalog
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	pathpkg "path"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	"robot/internal/foundation/atomicfile"
@@ -15,6 +19,9 @@ import (
 const maxSafePartySkillLevel = 70
 
 type partySkillCatalogEntry struct {
+	ID         string          `json:"id,omitempty"`
+	Enabled    bool            `json:"enabled"`
+	JobLabel   string          `json:"job_label,omitempty"`
 	Disabled   bool            `json:"disabled,omitempty"`
 	Job        int             `json:"job"`
 	SkillIndex int             `json:"skill_index"`
@@ -24,6 +31,7 @@ type partySkillCatalogEntry struct {
 	ScriptPath string          `json:"script_path,omitempty"`
 	StateData  json.RawMessage `json:"state_data,omitempty"`
 	Risk       int             `json:"risk,omitempty"`
+	enabledSet bool
 }
 
 type partySkillCatalogDocument struct {
@@ -33,6 +41,9 @@ type partySkillCatalogDocument struct {
 }
 
 type partySkillCatalogEntryDocument struct {
+	ID         string           `json:"id,omitempty"`
+	Enabled    *bool            `json:"enabled,omitempty"`
+	JobLabel   string           `json:"job_label,omitempty"`
 	Disabled   bool             `json:"disabled,omitempty"`
 	Job        *int             `json:"job"`
 	SkillIndex *int             `json:"skill_index"`
@@ -58,6 +69,7 @@ type PartySkillCatalogReport struct {
 	Issues                  []PartySkillCatalogIssue
 	SourceCount             int
 	DisabledCount           int
+	SwitchOffCount          int
 	OverLevelCount          int
 	ConfiguredMaxSkillLevel int
 	EffectiveMaxSkillLevel  int
@@ -150,6 +162,10 @@ func parsePartySkillCatalog(data []byte) (PartySkillCatalogReport, error) {
 			report.DisabledCount++
 			continue
 		}
+		if !entry.Enabled {
+			report.SwitchOffCount++
+			continue
+		}
 		if entry.Level > report.EffectiveMaxSkillLevel {
 			report.OverLevelCount++
 			continue
@@ -164,6 +180,140 @@ func parsePartySkillCatalog(data []byte) (PartySkillCatalogReport, error) {
 		report.Entries = nil
 	}
 	return report, nil
+}
+
+// SyncPartySkillCatalog rebuilds the user-facing switch list from the current
+// PVF export. Existing explicit switches and verified protocol metadata are
+// preserved by the complete runtime key; newly discovered skills are off.
+func SyncPartySkillCatalog(path, pvfPath string) (bool, error) {
+	pvfData, err := os.ReadFile(pvfPath)
+	if err != nil {
+		return false, err
+	}
+	var pvfStates []shared.SkillState
+	if err := json.Unmarshal(pvfData, &pvfStates); err != nil {
+		return false, fmt.Errorf("decode PVF skill catalog: %w", err)
+	}
+	if len(pvfStates) == 0 {
+		return false, fmt.Errorf("PVF skill catalog is empty")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	raw, err := decodePartySkillCatalogDocument(data)
+	if err != nil {
+		return false, err
+	}
+	existing := make(map[string]partySkillCatalogEntry, len(*raw.Skills))
+	for index, rawEntry := range *raw.Skills {
+		entry, err := decodePartySkillCatalogEntry(index, rawEntry)
+		if err != nil {
+			return false, err
+		}
+		// Old hand-written whitelist entries had no switch. Migrate them to the
+		// safe generated default instead of silently enabling skills.
+		if !entry.enabledSet {
+			entry.Enabled = false
+		}
+		existing[partySkillRuntimeKey(entry.Job, entry.SkillIndex, entry.State, entry.ScriptPath)] = entry
+	}
+
+	entries := make([]partySkillCatalogEntry, 0, len(pvfStates))
+	seen := make(map[string]struct{}, len(pvfStates))
+	for _, state := range pvfStates {
+		key := partySkillRuntimeKey(state.Job, state.SkillIndex, state.State, state.ScriptPath)
+		if _, duplicate := seen[key]; duplicate {
+			continue
+		}
+		seen[key] = struct{}{}
+		entry, ok := existing[key]
+		if !ok {
+			entry = partySkillCatalogEntry{
+				Enabled: false,
+				Job:     state.Job, SkillIndex: state.SkillIndex, State: state.State,
+				Level: maxSafePartySkillLevel, ScriptPath: state.ScriptPath,
+				Name: partySkillDisplayName(state.ScriptPath), Risk: 2,
+			}
+		}
+		entry.ID = key
+		entry.JobLabel = partySkillJobLabel(state.Job)
+		entry.Job = state.Job
+		entry.SkillIndex = state.SkillIndex
+		entry.State = state.State
+		entry.ScriptPath = state.ScriptPath
+		entry.Disabled = false
+		entry.enabledSet = false
+		if strings.TrimSpace(entry.Name) == "" {
+			entry.Name = partySkillDisplayName(state.ScriptPath)
+		}
+		if entry.Level <= 0 || entry.Level > maxSafePartySkillLevel {
+			entry.Level = maxSafePartySkillLevel
+		}
+		entries = append(entries, entry)
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Job != entries[j].Job {
+			return entries[i].Job < entries[j].Job
+		}
+		if entries[i].SkillIndex != entries[j].SkillIndex {
+			return entries[i].SkillIndex < entries[j].SkillIndex
+		}
+		if entries[i].State != entries[j].State {
+			return entries[i].State < entries[j].State
+		}
+		return entries[i].ScriptPath < entries[j].ScriptPath
+	})
+
+	out, err := json.MarshalIndent(struct {
+		Enabled       bool                     `json:"enabled"`
+		MaxSkillLevel int                      `json:"max_skill_level"`
+		Skills        []partySkillCatalogEntry `json:"skills"`
+	}{Enabled: *raw.Enabled, MaxSkillLevel: *raw.MaxSkillLevel, Skills: entries}, "", "  ")
+	if err != nil {
+		return false, err
+	}
+	out = append(out, '\n')
+	report, err := parsePartySkillCatalog(out)
+	if err != nil {
+		return false, err
+	}
+	if len(report.Issues) > 0 {
+		return false, &PartySkillCatalogValidationError{Issues: report.Issues}
+	}
+	if bytes.Equal(data, out) {
+		return false, nil
+	}
+	if err := atomicfile.WriteFile(path, out, 0644); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func partySkillRuntimeKey(job, skillIndex, state int, scriptPath string) string {
+	return strconv.Itoa(job) + ":" + strconv.Itoa(skillIndex) + ":" + strconv.Itoa(state) + ":" + normalizePartySkillCatalogPath(scriptPath)
+}
+
+func normalizePartySkillCatalogPath(value string) string {
+	value = strings.ReplaceAll(strings.TrimSpace(value), "\\", "/")
+	return strings.ToLower(strings.Trim(value, "/"))
+}
+
+func partySkillDisplayName(scriptPath string) string {
+	name := strings.TrimSuffix(pathpkg.Base(normalizePartySkillCatalogPath(scriptPath)), pathpkg.Ext(scriptPath))
+	if name == "" || name == "." {
+		return "skill"
+	}
+	return name
+}
+
+func partySkillJobLabel(job int) string {
+	labels := [...]string{"男鬼剑士", "女格斗家", "男神枪手", "女魔法师", "男圣职者", "女神枪手", "暗夜使者", "男格斗家", "男魔法师", "黑暗武士", "缔造者"}
+	if job >= 0 && job < len(labels) {
+		return labels[job]
+	}
+	return "职业 " + strconv.Itoa(job)
 }
 
 func decodePartySkillCatalogDocument(data []byte) (partySkillCatalogDocument, error) {
@@ -193,9 +343,11 @@ func decodePartySkillCatalogEntry(index int, data []byte) (partySkillCatalogEntr
 		stateData = append(json.RawMessage(nil), (*raw.StateData)...)
 	}
 	return partySkillCatalogEntry{
+		ID: raw.ID, Enabled: raw.Enabled == nil || *raw.Enabled, JobLabel: raw.JobLabel,
 		Disabled: raw.Disabled, Job: *raw.Job, SkillIndex: *raw.SkillIndex,
 		State: *raw.State, Level: *raw.Level, Name: raw.Name,
 		ScriptPath: raw.ScriptPath, StateData: stateData, Risk: raw.Risk,
+		enabledSet: raw.Enabled != nil,
 	}, nil
 }
 
