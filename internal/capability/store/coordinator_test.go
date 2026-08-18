@@ -227,6 +227,40 @@ func TestStorePointCoordinatorPromotesProbeOnlyOnItemStoreAck(t *testing.T) {
 	}
 }
 
+func TestStorePointCoordinatorExpandsVerifiedProbeAreaBeforeDiscoveringAnother(t *testing.T) {
+	configDir := t.TempDir()
+	writeStoreMapCatalog(t, configDir, []shared.MapCatalogItem{
+		{Village: 2, Area: 0, XMin: 1, XMax: 1200, YMin: 200, YMax: 200, Use: true, StoreEligible: eligibility(false), StoreProbe: eligibility(true)},
+		{Village: 3, Area: 0, XMin: 1, XMax: 1200, YMin: 200, YMax: 200, Use: true, StoreEligible: eligibility(false), StoreProbe: eligibility(true)},
+	})
+	c := newTestPointCoordinator(configDir, nil)
+	c.probeInterval = 0
+
+	anchor, ok := c.ClaimForItemStoreWhere(1001, 0, nil)
+	if !ok || anchor.Village != 2 || anchor.Source != PointSourceProbe {
+		t.Fatalf("initial discovery=%+v ok=%t", anchor, ok)
+	}
+	c.Report(1001, anchor, true, StoreReasonAck)
+
+	seen := map[string]bool{anchor.PointID: true}
+	for uid := 1002; uid <= 1004; uid++ {
+		pos, claimed := c.ClaimForItemStoreWhere(uid, 0, nil)
+		if !claimed || pos.Village != anchor.Village || pos.Area != anchor.Area || pos.Source != PointSourceProbe {
+			t.Fatalf("expansion uid=%d position=%+v claimed=%t, want verified area", uid, pos, claimed)
+		}
+		if seen[pos.PointID] {
+			t.Fatalf("expansion repeated point %s", pos.PointID)
+		}
+		seen[pos.PointID] = true
+		c.Discard(uid, pos)
+	}
+
+	discovery, ok := c.ClaimForItemStoreWhere(1005, 0, nil)
+	if !ok || discovery.Village != 3 || discovery.Source != PointSourceProbe {
+		t.Fatalf("discovery after expansion burst=%+v ok=%t, want another area", discovery, ok)
+	}
+}
+
 func TestBuildStoreGridPointsExcludesZeroCoordinates(t *testing.T) {
 	points := BuildGridPoints([]shared.MapCatalogItem{{
 		Village: 3, Area: 0, XMin: 0, XMax: PointXStep * 2,

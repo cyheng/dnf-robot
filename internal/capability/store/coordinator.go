@@ -18,6 +18,7 @@ const (
 	pointEvidenceWindow = 2 * time.Minute
 	pointEvidenceLimit  = 3
 	storeProbeInterval  = 2 * time.Minute
+	probeExpansionBurst = 3
 )
 
 const (
@@ -62,35 +63,38 @@ type Position struct {
 }
 
 type PointCoordinator struct {
-	pointMu         lockhub.Locker
-	cacheMu         lockhub.Locker
-	flushMu         lockhub.Locker
-	activeSave      activePointPersistence
-	configDir       string
-	sourcePath      string
-	sourceName      string
-	sourceMD5       string
-	generatedAt     string
-	points          []GridPoint
-	byID            map[string]int
-	byArea          map[areaKey][]int
-	areaOrder       []areaKey
-	areaCursor      int
-	probeAreaCursor int
-	lastProbeAt     time.Time
-	probeInterval   time.Duration
-	pointClaims     map[string]pointClaim
-	pointOccupancy  map[areaKey]map[occupancyCell]map[string]pointOccupancy
-	pointEvidence   map[pointEvidenceKey]map[int]time.Time
-	pointCooldown   map[string]time.Time
-	packedPoints    map[string]bool
-	failedPoints    map[string]bool
-	successPoints   map[string]bool
-	triedPoints     map[string]bool
-	dirtyCount      int
-	activeDirty     int
-	lastCacheSave   time.Time
-	logf            func(string, ...interface{})
+	pointMu              lockhub.Locker
+	cacheMu              lockhub.Locker
+	flushMu              lockhub.Locker
+	activeSave           activePointPersistence
+	configDir            string
+	sourcePath           string
+	sourceName           string
+	sourceMD5            string
+	generatedAt          string
+	points               []GridPoint
+	byID                 map[string]int
+	byArea               map[areaKey][]int
+	areaOrder            []areaKey
+	areaCursor           int
+	probeAreaCursor      int
+	probeExpansionCursor int
+	probeExpansionStreak int
+	lastProbeAt          time.Time
+	probeInterval        time.Duration
+	probeAttempted       map[string]bool
+	pointClaims          map[string]pointClaim
+	pointOccupancy       map[areaKey]map[occupancyCell]map[string]pointOccupancy
+	pointEvidence        map[pointEvidenceKey]map[int]time.Time
+	pointCooldown        map[string]time.Time
+	packedPoints         map[string]bool
+	failedPoints         map[string]bool
+	successPoints        map[string]bool
+	triedPoints          map[string]bool
+	dirtyCount           int
+	activeDirty          int
+	lastCacheSave        time.Time
+	logf                 func(string, ...interface{})
 }
 
 type pointClaim struct {
@@ -131,6 +135,7 @@ func newPointCoordinator(configDir, sourcePath string, logf func(string, ...inte
 		failedPoints:   make(map[string]bool),
 		successPoints:  make(map[string]bool),
 		triedPoints:    make(map[string]bool),
+		probeAttempted: make(map[string]bool),
 		lastCacheSave:  time.Now(),
 		probeInterval:  storeProbeInterval,
 		logf:           logf,
@@ -229,26 +234,107 @@ func (c *PointCoordinator) claim(uid int, lease, reuseAfter time.Duration, allow
 }
 
 func (c *PointCoordinator) claimProbe(uid int, now time.Time, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
+	if c.probeExpansionStreak < probeExpansionBurst {
+		if pos, ok := c.claimProbeExpansion(uid, now, lease, reuseAfter, allowed); ok {
+			c.probeExpansionStreak++
+			return pos, true
+		}
+	}
+	if pos, ok := c.claimProbeDiscovery(uid, now, lease, reuseAfter, allowed); ok {
+		c.probeExpansionStreak = 0
+		return pos, true
+	}
+	if pos, ok := c.claimProbeExpansion(uid, now, lease, reuseAfter, allowed); ok {
+		c.probeExpansionStreak++
+		return pos, true
+	}
+	return Position{}, false
+}
+
+func (c *PointCoordinator) claimProbeDiscovery(uid int, now time.Time, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
 	for scanned := 0; scanned < len(c.areaOrder); scanned++ {
 		area := c.areaOrder[c.probeAreaCursor%len(c.areaOrder)]
 		c.probeAreaCursor = (c.probeAreaCursor + 1) % len(c.areaOrder)
 		for _, idx := range c.byArea[area] {
 			pt := c.points[idx]
-			if !pt.Probe || c.triedPoints[pt.ID] || c.failedPoints[pt.ID] || !c.packedPoints[pt.ID] {
+			if !c.probePointAvailable(pt, area, now, lease, allowed) {
 				continue
 			}
 			pos := Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, Source: PointSourceProbe, PointID: pt.ID}
-			if allowed != nil && !allowed(pos) {
-				continue
-			}
-			if c.positionRecentlyOccupied(area, pt, now) || c.recentFailedPoint(pt, now, lease) {
-				continue
-			}
+			c.probeAttempted[pt.ID] = true
 			c.setPointClaimLocked(pt.ID, newPointClaim(uid, now, lease, reuseAfter))
+			c.logf("[StoreProbe] discover point=%s village=%d area=%d x=%d y=%d uid=%d\n", pt.ID, pt.Village, pt.Area, pt.X, pt.Y, uid)
 			return pos, true
 		}
 	}
 	return Position{}, false
+}
+
+func (c *PointCoordinator) claimProbeExpansion(uid int, now time.Time, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
+	for scanned := 0; scanned < len(c.areaOrder); scanned++ {
+		area := c.areaOrder[c.probeExpansionCursor%len(c.areaOrder)]
+		c.probeExpansionCursor = (c.probeExpansionCursor + 1) % len(c.areaOrder)
+		anchors := c.verifiedProbeAnchors(area)
+		if len(anchors) == 0 {
+			continue
+		}
+		bestIdx, bestDistance := -1, int64(^uint64(0)>>1)
+		for _, idx := range c.byArea[area] {
+			pt := c.points[idx]
+			if !c.probePointAvailable(pt, area, now, lease, allowed) {
+				continue
+			}
+			distance := nearestProbeDistanceSquared(pt, anchors)
+			if bestIdx < 0 || distance < bestDistance {
+				bestIdx, bestDistance = idx, distance
+			}
+		}
+		if bestIdx < 0 {
+			continue
+		}
+		pt := c.points[bestIdx]
+		pos := Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, Source: PointSourceProbe, PointID: pt.ID}
+		c.probeAttempted[pt.ID] = true
+		c.setPointClaimLocked(pt.ID, newPointClaim(uid, now, lease, reuseAfter))
+		c.logf("[StoreProbe] expand point=%s village=%d area=%d x=%d y=%d uid=%d distance2=%d\n", pt.ID, pt.Village, pt.Area, pt.X, pt.Y, uid, bestDistance)
+		return pos, true
+	}
+	return Position{}, false
+}
+
+func (c *PointCoordinator) probePointAvailable(pt GridPoint, area areaKey, now time.Time, lease time.Duration, allowed func(Position) bool) bool {
+	if !pt.Probe || c.probeAttempted[pt.ID] || c.triedPoints[pt.ID] || c.failedPoints[pt.ID] || !c.packedPoints[pt.ID] {
+		return false
+	}
+	pos := Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, Source: PointSourceProbe, PointID: pt.ID}
+	if allowed != nil && !allowed(pos) {
+		return false
+	}
+	return !c.positionRecentlyOccupied(area, pt, now) && !c.recentFailedPoint(pt, now, lease)
+}
+
+func (c *PointCoordinator) verifiedProbeAnchors(area areaKey) []GridPoint {
+	var anchors []GridPoint
+	for _, idx := range c.byArea[area] {
+		pt := c.points[idx]
+		if pt.ProbeVerified && !pt.Probe {
+			anchors = append(anchors, pt)
+		}
+	}
+	return anchors
+}
+
+func nearestProbeDistanceSquared(point GridPoint, anchors []GridPoint) int64 {
+	best := int64(^uint64(0) >> 1)
+	for _, anchor := range anchors {
+		dx := int64(point.X - anchor.X)
+		dy := int64(point.Y - anchor.Y)
+		distance := dx*dx + dy*dy
+		if distance < best {
+			best = distance
+		}
+	}
+	return best
 }
 
 func (c *PointCoordinator) claimAcrossAreas(fn func(areaKey) (Position, bool)) (Position, bool) {
