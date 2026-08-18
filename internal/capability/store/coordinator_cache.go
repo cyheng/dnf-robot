@@ -153,7 +153,7 @@ func (c *PointCoordinator) rebuildIndexes() {
 		if pt.Success > 0 || pt.Status == PointStatusSuccess || pt.Status == PointStatusFailed {
 			c.triedPoints[pt.ID] = true
 		}
-		if pt.Success > 0 || pt.Status == PointStatusSuccess {
+		if !pt.Probe && (pt.Success > 0 || pt.Status == PointStatusSuccess) {
 			c.successPoints[pt.ID] = true
 			continue
 		}

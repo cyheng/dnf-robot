@@ -61,6 +61,7 @@ type MapCatalogItem struct {
 	Gate           bool           `json:"gate,omitempty"`
 	NormalEligible *bool          `json:"normal_eligible,omitempty"`
 	StoreEligible  *bool          `json:"store_eligible,omitempty"`
+	StoreProbe     *bool          `json:"store_probe_eligible,omitempty"`
 }
 
 type MapRectangle struct {

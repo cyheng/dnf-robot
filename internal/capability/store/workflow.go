@@ -217,7 +217,7 @@ func (w Workflow) AutoUntilSuccess(st robotcap.RuntimeStatus, rc robotconfig.Run
 	finalReason := StoreReasonFailed
 	attempts := 0
 	allowedPosition := func(pos Position) bool { return shared.GenericAreaAllowed(info.GuildID, pos.Village) }
-	firstPos, ok := points.ClaimForStoreWhere(info.UID, rc.AutoStoreDurationSec, allowedPosition)
+	firstPos, ok := points.ClaimForItemStoreWhere(info.UID, rc.AutoStoreDurationSec, allowedPosition)
 	if !ok {
 		points.Flush()
 		return AutoAttemptBusy
@@ -246,14 +246,14 @@ func (w Workflow) AutoUntilSuccess(st robotcap.RuntimeStatus, rc robotconfig.Run
 			break
 		}
 		if try > 1 {
-			pos, ok = points.ClaimForStoreWhere(info.UID, rc.AutoStoreDurationSec, allowedPosition)
+			pos, ok = points.ClaimForItemStoreWhere(info.UID, rc.AutoStoreDurationSec, allowedPosition)
 			if !ok {
 				env.Logf("[AutoStore] uid=%d no_store_point try=%d/%d\n", info.UID, try, tries)
 				break
 			}
 		}
 		info.Village, info.Area, info.X, info.Y = pos.Village, pos.Area, pos.X, pos.Y
-		if ok, reason := w.tryPosition(info, rc, try, shouldStop); ok {
+		if ok, reason := w.tryPosition(info, rc, try, pos.Source == PointSourceProbe, shouldStop); ok {
 			points.CommitAttemptFailure(info.UID, &failureState)
 			points.Report(info.UID, pos, true, StoreReasonAck)
 			env.Logf("[StoreSuccessPoint] uid=%d point=%s village=%d area=%d x=%d y=%d try=%d source=%s\n", info.UID, pos.PointID, info.Village, info.Area, info.X, info.Y, try, pos.Source)
@@ -362,19 +362,22 @@ func (w Workflow) finishAndRestoreAutoNormal(info robotcap.Info, rc robotconfig.
 	return recovered
 }
 
-func (w Workflow) tryPosition(info robotcap.Info, rc robotconfig.RuntimeConfig, try int, shouldStop func() bool) (bool, string) {
+func (w Workflow) tryPosition(info robotcap.Info, rc robotconfig.RuntimeConfig, try int, forceCoordinate bool, shouldStop func() bool) (bool, string) {
 	env := w.Env
 	if shouldStop != nil && shouldStop() {
 		return false, StoreReasonCancelled
 	}
 	stAfterOnline, stOK := env.RuntimeStatusMap()[info.UID]
-	if stOK && stAfterOnline.Village == info.Village && stAfterOnline.Area == info.Area {
+	if stOK && !storePositionRequiresAreaSet(stAfterOnline, info, forceCoordinate) {
 		return w.startAndWaitDisplay(info, rc, try, shouldStop)
 	}
-	if stOK && (stAfterOnline.Village != info.Village || stAfterOnline.Area != info.Area) {
+	if stOK {
 		if points := env.StorePoints(); points == nil || !points.HasArea(info.Village, info.Area) {
 			env.Logf("[AutoStore] uid=%d set_area_skipped_unsafe try=%d from=%d/%d to=%d/%d\n", info.UID, try, stAfterOnline.Village, stAfterOnline.Area, info.Village, info.Area)
 			return false, StoreReasonSetAreaFailed
+		}
+		if forceCoordinate && stAfterOnline.Village == info.Village && stAfterOnline.Area == info.Area {
+			env.Logf("[StoreProbe] relocate uid=%d village=%d area=%d from=%d/%d to=%d/%d\n", info.UID, info.Village, info.Area, stAfterOnline.X, stAfterOnline.Y, info.X, info.Y)
 		}
 		areaSet := env.SetAreaFrom(info.UID, info.Village, info.Area, info.X, info.Y, stAfterOnline.Village, stAfterOnline.Area)
 		if !areaSet {
@@ -385,6 +388,13 @@ func (w Workflow) tryPosition(info robotcap.Info, rc robotconfig.RuntimeConfig, 
 		}
 	}
 	return w.startAndWaitDisplay(info, rc, try, shouldStop)
+}
+
+func storePositionRequiresAreaSet(current robotcap.RuntimeStatus, target robotcap.Info, forceCoordinate bool) bool {
+	if current.Village != target.Village || current.Area != target.Area {
+		return true
+	}
+	return forceCoordinate && (current.X != target.X || current.Y != target.Y)
 }
 
 func (w Workflow) startAndWaitDisplay(info robotcap.Info, rc robotconfig.RuntimeConfig, try int, shouldStop func() bool) (bool, string) {

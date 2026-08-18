@@ -8,6 +8,21 @@ import (
 	"testing"
 )
 
+func TestStorePositionRequiresAreaSetForProbeCoordinate(t *testing.T) {
+	current := robotcap.RuntimeStatus{Village: 2, Area: 0, X: 100, Y: 200}
+	target := robotcap.Info{Village: 2, Area: 0, X: 340, Y: 280}
+	if storePositionRequiresAreaSet(current, target, false) {
+		t.Fatal("normal store changed same-area behavior")
+	}
+	if !storePositionRequiresAreaSet(current, target, true) {
+		t.Fatal("probe did not require relocation to its selected coordinate")
+	}
+	target.X, target.Y = current.X, current.Y
+	if storePositionRequiresAreaSet(current, target, true) {
+		t.Fatal("probe requested redundant relocation at the selected coordinate")
+	}
+}
+
 type cancellingWorkflowEnv struct {
 	WorkflowEnv
 	points   *PointCoordinator

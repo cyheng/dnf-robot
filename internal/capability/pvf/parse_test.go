@@ -221,7 +221,7 @@ func TestExtractMapListNeverFabricatesAreasOrCoordinates(t *testing.T) {
 	if !maps[0].Use || maps[0].XMin != 10 || maps[0].XMax != 310 || maps[0].YMin != 20 || maps[0].YMax != 120 || len(maps[0].Rectangles) != 1 {
 		t.Fatalf("ready map=%+v", maps[0])
 	}
-	if maps[0].NormalEligible == nil || !*maps[0].NormalEligible || maps[0].StoreEligible == nil || !*maps[0].StoreEligible {
+	if maps[0].NormalEligible == nil || !*maps[0].NormalEligible || maps[0].StoreEligible == nil || !*maps[0].StoreEligible || maps[0].StoreProbe == nil || *maps[0].StoreProbe {
 		t.Fatalf("normal map eligibility was not exported: %+v", maps[0])
 	}
 	if !maps[1].Use || maps[1].XMin != 10 || maps[1].XMax != 310 || maps[1].YMin != 20 || maps[1].YMax != 120 || len(maps[1].Rectangles) != 1 {
@@ -233,7 +233,7 @@ func TestExtractMapListNeverFabricatesAreasOrCoordinates(t *testing.T) {
 	if !maps[3].Gate || !maps[3].Use || maps[3].XMin != 50 || maps[3].XMax != 450 {
 		t.Fatalf("gate map with virtual geometry was not exported: %+v", maps[3])
 	}
-	if maps[3].NormalEligible == nil || !*maps[3].NormalEligible || maps[3].StoreEligible == nil || *maps[3].StoreEligible {
+	if maps[3].NormalEligible == nil || !*maps[3].NormalEligible || maps[3].StoreEligible == nil || *maps[3].StoreEligible || maps[3].StoreProbe == nil || *maps[3].StoreProbe {
 		t.Fatalf("gate eligibility was not split: %+v", maps[3])
 	}
 	if !maps[4].Gate || maps[4].Use {
@@ -284,13 +284,13 @@ func TestExtractMapListDerivesEligibilityFromPVFAreaKind(t *testing.T) {
 	if len(maps) != 3 {
 		t.Fatalf("maps=%+v", maps)
 	}
-	if !*maps[0].NormalEligible || !*maps[0].StoreEligible {
+	if !*maps[0].NormalEligible || !*maps[0].StoreEligible || *maps[0].StoreProbe {
 		t.Fatalf("normal eligibility=%+v", maps[0])
 	}
-	if !*maps[1].NormalEligible || *maps[1].StoreEligible {
+	if !*maps[1].NormalEligible || *maps[1].StoreEligible || !*maps[1].StoreProbe {
 		t.Fatalf("waiting eligibility=%+v", maps[1])
 	}
-	if *maps[2].NormalEligible || *maps[2].StoreEligible {
+	if *maps[2].NormalEligible || *maps[2].StoreEligible || *maps[2].StoreProbe {
 		t.Fatalf("pvp eligibility=%+v", maps[2])
 	}
 }

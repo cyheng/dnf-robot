@@ -48,6 +48,7 @@ func TestStorePointFactConstants(t *testing.T) {
 		{PointSourceUnknown, "grid_unknown"},
 		{PointSourceSuccess, "grid_success"},
 		{PointSourceFailedRetry, "grid_failed_retry"},
+		{PointSourceProbe, "grid_probe"},
 		{StoreReasonAck, "store_ack"},
 		{StoreReasonDisjointAck, "disjoint_ack"},
 		{StoreReasonFailed, "store_failed"},
@@ -148,6 +149,81 @@ func TestBuildStoreGridPointsUsesPVFStoreEligibility(t *testing.T) {
 	})
 	if len(points) != 1 || points[0].Village != 3 || points[0].Area != 0 {
 		t.Fatalf("bad store areas were not filtered: %+v", points)
+	}
+}
+
+func TestStorePointCoordinatorRateLimitsItemStoreProbes(t *testing.T) {
+	configDir := t.TempDir()
+	writeStoreMapCatalog(t, configDir, []shared.MapCatalogItem{
+		{Village: 1, Area: 0, XMin: 1, XMax: 360, YMin: 1, YMax: 160, Use: true, StoreEligible: eligibility(true), StoreProbe: eligibility(false)},
+		{Village: 2, Area: 0, XMin: 1, XMax: 360, YMin: 1, YMax: 160, Use: true, StoreEligible: eligibility(false), StoreProbe: eligibility(true)},
+	})
+	c := newTestPointCoordinator(configDir, nil)
+
+	probe, ok := c.ClaimForItemStoreWhere(1001, 210, nil)
+	if !ok || probe.Source != PointSourceProbe || probe.Village != 2 {
+		t.Fatalf("first item-store claim=%+v ok=%t, want probe", probe, ok)
+	}
+	normal, ok := c.ClaimForItemStoreWhere(1002, 210, nil)
+	if !ok || normal.Source == PointSourceProbe || normal.Village != 1 {
+		t.Fatalf("rate-limited claim=%+v ok=%t, want normal point", normal, ok)
+	}
+	legacy, ok := c.ClaimForStoreWhere(1003, 210, nil)
+	if !ok || legacy.Source == PointSourceProbe || legacy.Village != 1 {
+		t.Fatalf("legacy store claim=%+v ok=%t, want normal point", legacy, ok)
+	}
+}
+
+func TestStorePointCoordinatorProbeHonorsDestinationPolicy(t *testing.T) {
+	configDir := t.TempDir()
+	writeStoreMapCatalog(t, configDir, []shared.MapCatalogItem{
+		{Village: 1, Area: 0, XMin: 1, XMax: 360, YMin: 1, YMax: 160, Use: true, StoreEligible: eligibility(true)},
+		{Village: 2, Area: 0, XMin: 1, XMax: 360, YMin: 1, YMax: 160, Use: true, StoreEligible: eligibility(false), StoreProbe: eligibility(true)},
+	})
+	c := newTestPointCoordinator(configDir, nil)
+	pos, ok := c.ClaimForItemStoreWhere(1001, 210, func(pos Position) bool { return pos.Village != 2 })
+	if !ok || pos.Village != 1 || pos.Source == PointSourceProbe {
+		t.Fatalf("destination policy claim=%+v ok=%t", pos, ok)
+	}
+}
+
+func TestStorePointCoordinatorPromotesProbeOnlyOnItemStoreAck(t *testing.T) {
+	configDir := t.TempDir()
+	writeStoreMapCatalog(t, configDir, []shared.MapCatalogItem{{
+		Village: 2, Area: 0, XMin: 1, XMax: 360, YMin: 1, YMax: 160, Use: true,
+		StoreEligible: eligibility(false), StoreProbe: eligibility(true),
+	}})
+	c := newTestPointCoordinator(configDir, nil)
+	c.probeInterval = 0
+
+	disjoint, ok := c.ClaimForItemStoreWhere(1001, 0, nil)
+	if !ok || disjoint.Source != PointSourceProbe {
+		t.Fatalf("disjoint probe claim=%+v ok=%t", disjoint, ok)
+	}
+	c.Report(1001, disjoint, true, StoreReasonDisjointAck)
+	if !c.points[c.byID[disjoint.PointID]].Probe || c.successPoints[disjoint.PointID] {
+		t.Fatalf("disjoint ack promoted probe: %+v", c.points[c.byID[disjoint.PointID]])
+	}
+
+	item, ok := c.ClaimForItemStoreWhere(1002, 0, nil)
+	if !ok || item.Source != PointSourceProbe {
+		t.Fatalf("item probe claim=%+v ok=%t", item, ok)
+	}
+	c.Report(1002, item, true, StoreReasonAck)
+	if c.points[c.byID[item.PointID]].Probe || !c.points[c.byID[item.PointID]].ProbeVerified || !c.successPoints[item.PointID] {
+		t.Fatalf("item ack did not promote probe: %+v", c.points[c.byID[item.PointID]])
+	}
+	c.Flush()
+
+	reloaded := newTestPointCoordinator(configDir, nil)
+	if reloaded.SuccessCount() != 1 {
+		t.Fatalf("reloaded successes=%d, want only item-store promotion", reloaded.SuccessCount())
+	}
+	if !reloaded.points[reloaded.byID[disjoint.PointID]].Probe {
+		t.Fatal("disjoint-only probe was promoted after reload")
+	}
+	if reloaded.points[reloaded.byID[item.PointID]].Probe {
+		t.Fatal("item-store promotion was lost after reload")
 	}
 }
 

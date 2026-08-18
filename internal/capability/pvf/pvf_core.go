@@ -29,7 +29,7 @@ type pvfManifest struct {
 	Runtime           interface{} `json:"runtime,omitempty"`
 }
 
-const pvfExportVersion = 3
+const pvfExportVersion = 4
 
 const pvfSkillStateExportVersion = 2
 
@@ -55,7 +55,7 @@ const (
 var (
 	pvfLegacySourceMarker   = []byte(`"source_path"`)
 	pvfEquipmentMarkers     = [][]byte{[]byte(`"item_type": 20`)}
-	pvfMapEligibilityMarker = [][]byte{[]byte(`"normal_eligible"`), []byte(`"store_eligible"`)}
+	pvfMapEligibilityMarker = [][]byte{[]byte(`"normal_eligible"`), []byte(`"store_eligible"`), []byte(`"store_probe_eligible"`)}
 )
 
 var exportMu lockhub.Locker

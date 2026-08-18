@@ -84,7 +84,7 @@ func TestPVFExportsCurrentInvalidatesOldSkillStateSchema(t *testing.T) {
 	files := map[string][]byte{
 		"equipment_catalog.json": []byte(`[{"item_type": 20}]`),
 		"stackable_catalog.json": []byte(`[{"id": 1}]`),
-		"map_catalog.json":       []byte(`[{"normal_eligible":true,"store_eligible":true}]`),
+		"map_catalog.json":       []byte(`[{"normal_eligible":true,"store_eligible":true,"store_probe_eligible":false}]`),
 		pvfSkillStateExportName:  []byte(`[{"job": 1}]`),
 		pvfLevelExpExportName:    []byte(`[0,0,1000]`),
 		pvfItemInfoExportName:    []byte("iteminfo"),
@@ -329,7 +329,7 @@ func BenchmarkPVFExportsCurrentStreaming(b *testing.B) {
 	files := map[string][]byte{
 		pvfEquipmentExportName:  append([]byte(`{"item_type": 20}`), large...),
 		pvfStackableExportName:  append([]byte(`[{"id":1}]`), large...),
-		pvfMapExportName:        append([]byte(`{"normal_eligible":true,"store_eligible":true}`), large...),
+		pvfMapExportName:        append([]byte(`{"normal_eligible":true,"store_eligible":true,"store_probe_eligible":false}`), large...),
 		pvfSkillStateExportName: []byte(`[{"job":1}]`),
 		pvfLevelExpExportName:   []byte(`[0,0,1000]`),
 		pvfItemInfoExportName:   []byte("iteminfo"),
@@ -358,7 +358,7 @@ func writeCurrentPVFExportFiles(t *testing.T, dir string) {
 	files := map[string][]byte{
 		"equipment_catalog.json": []byte(`[{"item_type": 20}]`),
 		"stackable_catalog.json": []byte(`[{"id": 1}]`),
-		"map_catalog.json":       []byte(`[{"normal_eligible":true,"store_eligible":true}]`),
+		"map_catalog.json":       []byte(`[{"normal_eligible":true,"store_eligible":true,"store_probe_eligible":false}]`),
 		pvfSkillStateExportName:  []byte(`[{"job": 1, "skill_index": 1, "state": 1}]`),
 		pvfLevelExpExportName:    []byte(`[0,0,1000]`),
 		pvfItemInfoExportName:    []byte("iteminfo"),

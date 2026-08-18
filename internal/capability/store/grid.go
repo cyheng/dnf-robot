@@ -18,17 +18,19 @@ const (
 )
 
 type GridPoint struct {
-	ID           string `json:"id"`
-	Village      int    `json:"village"`
-	Area         int    `json:"area"`
-	X            int    `json:"x"`
-	Y            int    `json:"y"`
-	Status       string `json:"status"`
-	Success      int    `json:"success"`
-	Failed       int    `json:"failed"`
-	LastUID      int    `json:"last_uid,omitempty"`
-	LastReason   string `json:"last_reason,omitempty"`
-	LastResultAt string `json:"last_result_at,omitempty"`
+	ID            string `json:"id"`
+	Village       int    `json:"village"`
+	Area          int    `json:"area"`
+	X             int    `json:"x"`
+	Y             int    `json:"y"`
+	Status        string `json:"status"`
+	Success       int    `json:"success"`
+	Failed        int    `json:"failed"`
+	LastUID       int    `json:"last_uid,omitempty"`
+	LastReason    string `json:"last_reason,omitempty"`
+	LastResultAt  string `json:"last_result_at,omitempty"`
+	Probe         bool   `json:"probe,omitempty"`
+	ProbeVerified bool   `json:"probe_verified,omitempty"`
 }
 
 type PointCache struct {
@@ -51,7 +53,9 @@ func BuildGridPoints(maps []shared.MapCatalogItem) []GridPoint {
 		if !mp.Use {
 			continue
 		}
-		if !IsStoreMapEligible(mp) {
+		storeEligible := IsStoreMapEligible(mp)
+		probeEligible := IsStoreProbeMapEligible(mp)
+		if !storeEligible && !probeEligible {
 			continue
 		}
 		for _, rectangle := range robotspawn.MapRectangles(mp) {
@@ -66,7 +70,7 @@ func BuildGridPoints(maps []shared.MapCatalogItem) []GridPoint {
 					}
 					seen[id] = struct{}{}
 					points = append(points, GridPoint{
-						ID: id, Village: mp.Village, Area: mp.Area, X: x, Y: y, Status: PointStatusUnknown,
+						ID: id, Village: mp.Village, Area: mp.Area, X: x, Y: y, Status: PointStatusUnknown, Probe: probeEligible && !storeEligible,
 					})
 				}
 			}
@@ -92,16 +96,37 @@ func FilterEligibleGridPoints(points []GridPoint, maps []shared.MapCatalogItem) 
 	if len(points) == 0 {
 		return nil
 	}
-	eligible := make(map[areaKey]bool)
+	type areaEligibility struct {
+		store bool
+		probe bool
+	}
+	eligible := make(map[areaKey]areaEligibility)
 	for _, mp := range maps {
-		if IsStoreMapEligible(mp) {
-			eligible[areaKey{mp.Village, mp.Area}] = true
+		storeEligible := IsStoreMapEligible(mp)
+		probeEligible := IsStoreProbeMapEligible(mp)
+		if storeEligible || probeEligible {
+			eligible[areaKey{mp.Village, mp.Area}] = areaEligibility{store: storeEligible, probe: probeEligible}
 		}
 	}
 	out := points[:0]
 	for _, pt := range points {
-		if !eligible[areaKey{pt.Village, pt.Area}] || pt.X <= 0 || pt.Y <= 0 {
+		area, ok := eligible[areaKey{pt.Village, pt.Area}]
+		if !ok || pt.X <= 0 || pt.Y <= 0 {
 			continue
+		}
+		if area.store {
+			pt.Probe = false
+			pt.ProbeVerified = false
+		} else if area.probe && !pt.Probe && !pt.ProbeVerified {
+			// Older probe promotions could be recorded without moving to the
+			// selected coordinate when the robot was already in the same area.
+			pt.Probe = true
+			pt.Status = PointStatusUnknown
+			pt.Success = 0
+			pt.Failed = 0
+			pt.LastUID = 0
+			pt.LastReason = ""
+			pt.LastResultAt = ""
 		}
 		out = append(out, pt)
 	}
@@ -127,4 +152,8 @@ func IsStoreMapEligible(mp shared.MapCatalogItem) bool {
 		return mp.Use && *mp.StoreEligible
 	}
 	return mp.Use && !mp.Gate
+}
+
+func IsStoreProbeMapEligible(mp shared.MapCatalogItem) bool {
+	return mp.Use && mp.StoreProbe != nil && *mp.StoreProbe && !mp.Gate
 }

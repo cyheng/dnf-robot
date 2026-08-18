@@ -17,6 +17,7 @@ const (
 	pointFailureBurst   = time.Minute
 	pointEvidenceWindow = 2 * time.Minute
 	pointEvidenceLimit  = 3
+	storeProbeInterval  = 2 * time.Minute
 )
 
 const (
@@ -29,6 +30,7 @@ const (
 	PointSourceUnknown     = "grid_unknown"
 	PointSourceSuccess     = "grid_success"
 	PointSourceFailedRetry = "grid_failed_retry"
+	PointSourceProbe       = "grid_probe"
 )
 
 const (
@@ -60,32 +62,35 @@ type Position struct {
 }
 
 type PointCoordinator struct {
-	pointMu        lockhub.Locker
-	cacheMu        lockhub.Locker
-	flushMu        lockhub.Locker
-	activeSave     activePointPersistence
-	configDir      string
-	sourcePath     string
-	sourceName     string
-	sourceMD5      string
-	generatedAt    string
-	points         []GridPoint
-	byID           map[string]int
-	byArea         map[areaKey][]int
-	areaOrder      []areaKey
-	areaCursor     int
-	pointClaims    map[string]pointClaim
-	pointOccupancy map[areaKey]map[occupancyCell]map[string]pointOccupancy
-	pointEvidence  map[pointEvidenceKey]map[int]time.Time
-	pointCooldown  map[string]time.Time
-	packedPoints   map[string]bool
-	failedPoints   map[string]bool
-	successPoints  map[string]bool
-	triedPoints    map[string]bool
-	dirtyCount     int
-	activeDirty    int
-	lastCacheSave  time.Time
-	logf           func(string, ...interface{})
+	pointMu         lockhub.Locker
+	cacheMu         lockhub.Locker
+	flushMu         lockhub.Locker
+	activeSave      activePointPersistence
+	configDir       string
+	sourcePath      string
+	sourceName      string
+	sourceMD5       string
+	generatedAt     string
+	points          []GridPoint
+	byID            map[string]int
+	byArea          map[areaKey][]int
+	areaOrder       []areaKey
+	areaCursor      int
+	probeAreaCursor int
+	lastProbeAt     time.Time
+	probeInterval   time.Duration
+	pointClaims     map[string]pointClaim
+	pointOccupancy  map[areaKey]map[occupancyCell]map[string]pointOccupancy
+	pointEvidence   map[pointEvidenceKey]map[int]time.Time
+	pointCooldown   map[string]time.Time
+	packedPoints    map[string]bool
+	failedPoints    map[string]bool
+	successPoints   map[string]bool
+	triedPoints     map[string]bool
+	dirtyCount      int
+	activeDirty     int
+	lastCacheSave   time.Time
+	logf            func(string, ...interface{})
 }
 
 type pointClaim struct {
@@ -127,6 +132,7 @@ func newPointCoordinator(configDir, sourcePath string, logf func(string, ...inte
 		successPoints:  make(map[string]bool),
 		triedPoints:    make(map[string]bool),
 		lastCacheSave:  time.Now(),
+		probeInterval:  storeProbeInterval,
 		logf:           logf,
 	}
 	if configDir != "" {
@@ -143,7 +149,7 @@ func (c *PointCoordinator) Claim(uid int) (Position, bool) {
 
 func (c *PointCoordinator) ClaimWithLease(uid int, lease time.Duration) (Position, bool) {
 	lease = normalizePointLease(lease)
-	return c.claim(uid, lease, lease, nil)
+	return c.claim(uid, lease, lease, nil, false)
 }
 
 // ClaimForStore keeps cleanup ownership for the longest possible configured
@@ -155,15 +161,26 @@ func (c *PointCoordinator) ClaimForStore(uid, storeDurationSec int) (Position, b
 
 // ClaimForStoreWhere applies destination policy before a point is claimed.
 func (c *PointCoordinator) ClaimForStoreWhere(uid, storeDurationSec int, allowed func(Position) bool) (Position, bool) {
+	return c.claimForStoreWhere(uid, storeDurationSec, allowed, false)
+}
+
+// ClaimForItemStoreWhere permits one globally rate-limited probe of an
+// unmarked PVF town area. Disjoint stores never call this path because a
+// successful special store is not evidence that an area is publicly usable.
+func (c *PointCoordinator) ClaimForItemStoreWhere(uid, storeDurationSec int, allowed func(Position) bool) (Position, bool) {
+	return c.claimForStoreWhere(uid, storeDurationSec, allowed, true)
+}
+
+func (c *PointCoordinator) claimForStoreWhere(uid, storeDurationSec int, allowed func(Position) bool, allowProbe bool) (Position, bool) {
 	cleanupLease := StorePointLeaseDuration(storeDurationSec)
 	reuseAfter := robotconfig.StoreDurationForUID(storeDurationSec, uid)
 	if reuseAfter < 0 {
 		reuseAfter = 0
 	}
-	return c.claim(uid, cleanupLease, reuseAfter, allowed)
+	return c.claim(uid, cleanupLease, reuseAfter, allowed, allowProbe)
 }
 
-func (c *PointCoordinator) claim(uid int, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
+func (c *PointCoordinator) claim(uid int, lease, reuseAfter time.Duration, allowed func(Position) bool, allowProbe bool) (Position, bool) {
 	c.pointMu.Lock()
 	defer c.pointMu.Unlock()
 	now := time.Now()
@@ -171,6 +188,12 @@ func (c *PointCoordinator) claim(uid int, lease, reuseAfter time.Duration, allow
 	c.clearExpiredClaims(now)
 	if len(c.areaOrder) == 0 {
 		return Position{}, false
+	}
+	if allowProbe && (c.lastProbeAt.IsZero() || now.Sub(c.lastProbeAt) >= c.probeInterval) {
+		if pos, ok := c.claimProbe(uid, now, lease, reuseAfter, allowed); ok {
+			c.lastProbeAt = now
+			return pos, true
+		}
 	}
 	if pos, ok := c.claimAcrossAreas(func(area areaKey) (Position, bool) {
 		return c.claimFromArea(uid, area, PointStatusSuccess, true, now, lease, reuseAfter, allowed)
@@ -205,6 +228,29 @@ func (c *PointCoordinator) claim(uid int, lease, reuseAfter time.Duration, allow
 	return Position{}, false
 }
 
+func (c *PointCoordinator) claimProbe(uid int, now time.Time, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
+	for scanned := 0; scanned < len(c.areaOrder); scanned++ {
+		area := c.areaOrder[c.probeAreaCursor%len(c.areaOrder)]
+		c.probeAreaCursor = (c.probeAreaCursor + 1) % len(c.areaOrder)
+		for _, idx := range c.byArea[area] {
+			pt := c.points[idx]
+			if !pt.Probe || c.triedPoints[pt.ID] || c.failedPoints[pt.ID] || !c.packedPoints[pt.ID] {
+				continue
+			}
+			pos := Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, Source: PointSourceProbe, PointID: pt.ID}
+			if allowed != nil && !allowed(pos) {
+				continue
+			}
+			if c.positionRecentlyOccupied(area, pt, now) || c.recentFailedPoint(pt, now, lease) {
+				continue
+			}
+			c.setPointClaimLocked(pt.ID, newPointClaim(uid, now, lease, reuseAfter))
+			return pos, true
+		}
+	}
+	return Position{}, false
+}
+
 func (c *PointCoordinator) claimAcrossAreas(fn func(areaKey) (Position, bool)) (Position, bool) {
 	for scanned := 0; scanned < len(c.areaOrder); scanned++ {
 		areaKey := c.areaOrder[c.areaCursor%len(c.areaOrder)]
@@ -219,6 +265,9 @@ func (c *PointCoordinator) claimAcrossAreas(fn func(areaKey) (Position, bool)) (
 func (c *PointCoordinator) claimFromArea(uid int, area areaKey, status string, packedOnly bool, now time.Time, lease, reuseAfter time.Duration, allowed func(Position) bool) (Position, bool) {
 	for _, idx := range c.byArea[area] {
 		pt := c.points[idx]
+		if pt.Probe {
+			continue
+		}
 		pos := Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, PointID: pt.ID}
 		if allowed != nil && !allowed(pos) {
 			continue
@@ -260,6 +309,9 @@ func (c *PointCoordinator) claimFailedFromArea(uid int, area areaKey, packedOnly
 	}
 	for _, idx := range c.byArea[area] {
 		pt := c.points[idx]
+		if pt.Probe {
+			continue
+		}
 		pos := Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, Source: PointSourceFailedRetry, PointID: pt.ID}
 		if allowed != nil && !allowed(pos) {
 			continue
@@ -283,6 +335,9 @@ func (c *PointCoordinator) claimFailedFromArea(uid int, area areaKey, packedOnly
 func (c *PointCoordinator) areaHasUsableSuccess(area areaKey, now time.Time, lease time.Duration, allowed func(Position) bool) bool {
 	for _, idx := range c.byArea[area] {
 		pt := c.points[idx]
+		if pt.Probe {
+			continue
+		}
 		if allowed != nil && !allowed(Position{Village: pt.Village, Area: pt.Area, X: pt.X, Y: pt.Y, PointID: pt.ID}) {
 			continue
 		}
@@ -362,7 +417,10 @@ func (c *PointCoordinator) Report(uid int, pos Position, ok bool, reason string)
 		c.clearPointEvidenceLocked(pos.PointID)
 		delete(c.pointCooldown, pos.PointID)
 		delete(c.failedPoints, pos.PointID)
-		c.successPoints[pos.PointID] = true
+		probePromoted := hasPoint && c.points[idx].Probe && reason == StoreReasonAck
+		if !hasPoint || !c.points[idx].Probe || probePromoted {
+			c.successPoints[pos.PointID] = true
+		}
 		if successReason {
 			claim := c.pointClaims[pos.PointID]
 			c.setPointSuccessOccupancyLocked(pos.PointID, nowTime.Add(claim.ReuseAfter))
@@ -371,6 +429,11 @@ func (c *PointCoordinator) Report(uid int, pos Position, ok bool, reason string)
 			activeChanged = c.clearPointSuccessOccupancyLocked(pos.PointID)
 		}
 		if hasPoint {
+			if probePromoted {
+				c.points[idx].Probe = false
+				c.points[idx].ProbeVerified = true
+				c.logf("[StoreProbe] promoted point=%s village=%d area=%d x=%d y=%d uid=%d\n", pos.PointID, pos.Village, pos.Area, pos.X, pos.Y, uid)
+			}
 			c.points[idx].Status = PointStatusSuccess
 			c.points[idx].Success++
 			c.points[idx].LastUID = uid
