@@ -102,3 +102,33 @@ func TestShellQuoteEscapesSingleQuotes(t *testing.T) {
 		t.Fatalf("quote = %q, want %q", got, want)
 	}
 }
+
+func TestRestartConfigDiffIncludesStartupOnlyFields(t *testing.T) {
+	running := &config.SysConfig{
+		DFGameR: "/home/neople/game/df_game_r", GameServerGroup: 3,
+		DBMaxSize: 64, DBDialTimeoutSec: 5, LogMaxSizeMB: 100, MaxResponseBytes: 4 * 1024 * 1024,
+	}
+	disk := *running
+	disk.DFGameR = "/srv/game/df_game_r"
+	disk.GameServerGroup = 4
+	disk.DBMaxSize = 128
+	disk.DBDialTimeoutSec = 8
+	disk.LogMaxSizeMB = 200
+	disk.MaxResponseBytes = 8 * 1024 * 1024
+
+	got := restartConfigDiff(running, &disk)
+	for _, want := range []string{"df_game_r", "game_server_group", "database_max_size", "database_dial_timeout_sec", "log_max_size_mb", "max_response_bytes"} {
+		if !containsString(got, want) {
+			t.Fatalf("restart diff missing %q: %v", want, got)
+		}
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}

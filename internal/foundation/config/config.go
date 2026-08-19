@@ -51,7 +51,6 @@ type SysConfig struct {
 	LogMaxSizeMB          int
 	LogMaxBackups         int
 	MaxResponseBytes      int
-	ThisIP                string
 }
 
 // LoadConfig reads config.ini and returns a populated SysConfig.
@@ -180,23 +179,11 @@ func decodeSysConfig(ini *INIConfig) (*SysConfig, error) {
 
 	// Resolve the explicit auto marker for runtime consumers while preserving
 	// the configured value for diagnostics and restart comparisons.
-	cfg.ThisIP = preferredLocalIPv4()
 	if strings.EqualFold(cfg.RobotConnectIPSetting, "auto") {
-		cfg.RobotConnectIP = cfg.ThisIP
+		cfg.RobotConnectIP = preferredLocalIPv4()
 	}
 
 	return cfg, nil
-}
-
-// DNFServiceRoot returns the common parent for sibling game, auction, and
-// point service directories. Unknown layouts keep the established default.
-func DNFServiceRoot(dfGameR string) string {
-	gameDir := filepath.Clean(filepath.Dir(strings.TrimSpace(dfGameR)))
-	root := filepath.Dir(gameDir)
-	if root == "." || root == string(filepath.Separator) {
-		return defaultDNFServiceRoot
-	}
-	return root
 }
 
 func preferredLocalIPv4() string {

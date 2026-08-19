@@ -138,13 +138,19 @@ func restartConfigView(cfg *config.SysConfig) map[string]interface{} {
 		"game_port": cfg.RobotGamePort, "monitor_port": cfg.MonitorPort,
 		"auction_port": cfg.AuctionPort, "point_port": cfg.PointPort,
 		"relay_port": cfg.RelayPort, "party_route0_port": cfg.PartyRoute0Port,
+		"df_game_r": cfg.DFGameR, "game_server_group": cfg.GameServerGroup,
 		"connect_ip": cfg.RobotConnectIP, "connect_setting": cfg.RobotConnectIPSetting, "inner_ip": cfg.RobotInnerIP,
 		"service_root": cfg.ServiceRoot, "service_run_script": cfg.ServiceRunScript,
 		"auction_host": cfg.AuctionHost, "point_host": cfg.PointHost, "relay_host": cfg.RelayHost,
 		"database_host": cfg.DBHost, "database_port": cfg.DBPort,
 		"database_name": cfg.DBName, "database_user": cfg.DBUser,
+		"database_init_size": cfg.DBInitSize, "database_max_size": cfg.DBMaxSize,
+		"database_dial_timeout_sec": cfg.DBDialTimeoutSec, "database_read_timeout_sec": cfg.DBReadTimeoutSec,
+		"database_write_timeout_sec": cfg.DBWriteTimeoutSec, "database_conn_max_lifetime_sec": cfg.DBConnMaxLifetimeSec,
 		"database_password_set": cfg.DBPassword != "",
 		"web_password_set":      cfg.WebPassword != "",
+		"log_max_size_mb":       cfg.LogMaxSizeMB, "log_max_backups": cfg.LogMaxBackups,
+		"max_response_bytes": cfg.MaxResponseBytes,
 	}
 }
 
@@ -161,6 +167,7 @@ func restartConfigDiff(running, disk *config.SysConfig) []string {
 		{"game_port", running.RobotGamePort != disk.RobotGamePort}, {"monitor_port", running.MonitorPort != disk.MonitorPort},
 		{"auction_port", running.AuctionPort != disk.AuctionPort}, {"point_port", running.PointPort != disk.PointPort},
 		{"relay_port", running.RelayPort != disk.RelayPort}, {"party_route0_port", running.PartyRoute0Port != disk.PartyRoute0Port},
+		{"df_game_r", running.DFGameR != disk.DFGameR}, {"game_server_group", running.GameServerGroup != disk.GameServerGroup},
 		{"robot_connect_ip", running.RobotConnectIP != disk.RobotConnectIP}, {"robot_inner_ip", running.RobotInnerIP != disk.RobotInnerIP},
 		{"robot_connect_setting", running.RobotConnectIPSetting != disk.RobotConnectIPSetting},
 		{"service_root", running.ServiceRoot != disk.ServiceRoot}, {"service_run_script", running.ServiceRunScript != disk.ServiceRunScript},
@@ -168,6 +175,13 @@ func restartConfigDiff(running, disk *config.SysConfig) []string {
 		{"database_host", running.DBHost != disk.DBHost}, {"database_port", running.DBPort != disk.DBPort},
 		{"database_name", running.DBName != disk.DBName}, {"database_user", running.DBUser != disk.DBUser},
 		{"database_password", running.DBPassword != disk.DBPassword}, {"web_password", running.WebPassword != disk.WebPassword},
+		{"database_init_size", running.DBInitSize != disk.DBInitSize}, {"database_max_size", running.DBMaxSize != disk.DBMaxSize},
+		{"database_dial_timeout_sec", running.DBDialTimeoutSec != disk.DBDialTimeoutSec},
+		{"database_read_timeout_sec", running.DBReadTimeoutSec != disk.DBReadTimeoutSec},
+		{"database_write_timeout_sec", running.DBWriteTimeoutSec != disk.DBWriteTimeoutSec},
+		{"database_conn_max_lifetime_sec", running.DBConnMaxLifetimeSec != disk.DBConnMaxLifetimeSec},
+		{"log_max_size_mb", running.LogMaxSizeMB != disk.LogMaxSizeMB}, {"log_max_backups", running.LogMaxBackups != disk.LogMaxBackups},
+		{"max_response_bytes", running.MaxResponseBytes != disk.MaxResponseBytes},
 	}
 	for _, check := range checks {
 		if check.different {
