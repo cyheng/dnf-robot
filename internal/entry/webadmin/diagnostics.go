@@ -353,9 +353,17 @@ type listeningPort struct {
 }
 
 func listeningProcessPorts() (map[int]listeningPort, error) {
-	out, err := exec.Command("ss", "-lntp").Output()
+	commands := [][]string{{"ss", "-lntp"}, {"netstat", "-lntp"}}
+	var out []byte
+	var err error
+	for _, command := range commands {
+		out, err = exec.Command(command[0], command[1:]...).Output()
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ss/netstat unavailable: %w", err)
 	}
 	portRE := regexp.MustCompile(`[:.]([0-9]{1,5})\s`)
 	result := map[int]listeningPort{}
@@ -372,8 +380,78 @@ func listeningProcessPorts() (map[int]listeningPort, error) {
 		if name, pid, ok := parseSSProcess(line); ok {
 			entry.Process = name
 			entry.PID = pid
+		} else if name, pid, ok := parseNetstatProcess(line); ok {
+			entry.Process = name
+			entry.PID = pid
 		}
 		result[port] = entry
+	}
+	return result, nil
+}
+
+var netstatProcessPattern = regexp.MustCompile(`([0-9]+)/([A-Za-z0-9_.-]+)`)
+
+func parseNetstatProcess(line string) (string, int, bool) {
+	match := netstatProcessPattern.FindStringSubmatch(line)
+	if len(match) != 3 {
+		return "", 0, false
+	}
+	pid, err := strconv.Atoi(match[1])
+	return match[2], pid, err == nil && pid > 0
+}
+
+type servicePortCandidate struct {
+	Port       int    `json:"port"`
+	Process    string `json:"process,omitempty"`
+	PID        int    `json:"pid,omitempty"`
+	Line       string `json:"line,omitempty"`
+	Confidence string `json:"confidence"`
+}
+
+type servicePortDiscovery struct {
+	Key            string                 `json:"key"`
+	Process        string                 `json:"process"`
+	ConfiguredPort int                    `json:"configured_port"`
+	Candidates     []servicePortCandidate `json:"candidates"`
+	State          string                 `json:"state"`
+}
+
+func discoverServicePorts(cfg *config.SysConfig) ([]servicePortDiscovery, error) {
+	ports, err := listeningProcessPorts()
+	if err != nil {
+		return nil, err
+	}
+	targets := []struct {
+		key, process string
+		configured   int
+	}{
+		{"game", "df_game_r", cfg.RobotGamePort},
+		{"monitor", "df_monitor_r", cfg.MonitorPort},
+		{"auction", "df_auction_r", cfg.AuctionPort},
+		{"point", "df_point_r", cfg.PointPort},
+		{"relay", "df_relay_r", cfg.RelayPort},
+	}
+	result := make([]servicePortDiscovery, 0, len(targets))
+	for _, target := range targets {
+		item := servicePortDiscovery{Key: target.key, Process: target.process, ConfiguredPort: target.configured, State: "not_running"}
+		for _, entry := range ports {
+			if !strings.Contains(strings.ToLower(entry.Process), strings.ToLower(target.process)) {
+				continue
+			}
+			item.Candidates = append(item.Candidates, servicePortCandidate{Port: entry.Port, Process: entry.Process, PID: entry.PID, Line: entry.Line, Confidence: "high"})
+		}
+		sort.Slice(item.Candidates, func(i, j int) bool { return item.Candidates[i].Port < item.Candidates[j].Port })
+		switch len(item.Candidates) {
+		case 1:
+			if item.Candidates[0].Port == target.configured {
+				item.State = "matched"
+			} else {
+				item.State = "mismatch"
+			}
+		default:
+			item.State = "multiple"
+		}
+		result = append(result, item)
 	}
 	return result, nil
 }

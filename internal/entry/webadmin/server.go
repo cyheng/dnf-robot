@@ -80,6 +80,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	mux.HandleFunc("/api/call", s.requireAuth(s.handleCall))
 	mux.HandleFunc("/api/game-port", s.requireAuth(s.handleGamePort))
 	mux.HandleFunc("/api/game-endpoint", s.requireAuth(s.handleGameEndpoint))
+	mux.HandleFunc("/api/service-ports", s.requireAuth(s.handleServicePorts))
 	mux.HandleFunc("/api/restart-robot", s.requireAuth(s.handleRestartRobot))
 	mux.HandleFunc("/api/max-user", s.requireAuth(s.handleMaxUser))
 	mux.HandleFunc("/api/server-script", s.requireAuth(s.handleServerScript))

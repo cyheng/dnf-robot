@@ -23,6 +23,15 @@ const (
 	gameMaxUserLimit    = 600
 )
 
+func (s *Server) handleServicePorts(w http.ResponseWriter, _ *http.Request) {
+	services, err := discoverServicePorts(s.cfg)
+	if err != nil {
+		writeJSON(w, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "services": services, "checked_at": time.Now().UTC().Format(time.RFC3339)})
+}
+
 var (
 	maxUserValuePattern   = regexp.MustCompile(`(?m)^\s*max_user_num\s*=\s*([0-9]+)\s*$`)
 	maxUserReplacePattern = regexp.MustCompile(`(?m)^(\s*max_user_num\s*=\s*)[0-9]+(\s*)$`)
