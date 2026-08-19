@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"robot/internal/foundation/lockhub"
+	foundationlog "robot/internal/foundation/log"
 )
 
 const (
@@ -273,7 +274,7 @@ func (s *TCPServer) handleClient(clientID, clientIP string, client *tcpClient) {
 func (s *TCPServer) dispatchMessage(clientID string, data []byte) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			fmt.Printf("[TCPServer] message_handler_panic client=%s err=%v\n", clientID, rec)
+			foundationlog.Robotf("TCP_MESSAGE_HANDLER_PANIC client=%s err=%v\n", clientID, rec)
 		}
 	}()
 	s.onMessage(clientID, data)
