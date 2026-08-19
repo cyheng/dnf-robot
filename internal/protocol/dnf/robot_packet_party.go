@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	foundationlog "robot/internal/foundation/log"
 )
 
 func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
@@ -17,9 +19,9 @@ func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
 		pkt, err := buildSendPacket(40, uint16(r.PacketID), buildFinishLoadingPayload(0, 0), r.Cipher)
 		r.PacketID++
 		if err != nil {
-			fmt.Printf("[DUNGEON_FINISH_LOADING_BUILD_ERROR] uid=%d source_type=%d err=%v\n", r.UID, packet.typ, err)
+			foundationlog.Robotf("[DUNGEON_FINISH_LOADING_BUILD_ERROR] uid=%d source_type=%d err=%v\n", r.UID, packet.typ, err)
 		} else if !r.sendRaw(pkt) {
-			fmt.Printf("[DUNGEON_FINISH_LOADING_SEND_ERROR] uid=%d source_type=%d\n", r.UID, packet.typ)
+			foundationlog.Robotf("[DUNGEON_FINISH_LOADING_SEND_ERROR] uid=%d source_type=%d\n", r.UID, packet.typ)
 		}
 
 	case 22:
@@ -48,7 +50,7 @@ func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
 		clears, source, err := partyInfoPacketClearsParty(r.Cipher, packet.data, packet.isAnti)
 		if err != nil {
 			recordPartyDebugPacket(r.UID, 0, "RX", "GAME", "PARTY_INFO_PARSE", "FAIL", err.Error(), packet.data)
-			fmt.Printf("[PARTY_INFO_PARSE_ERROR] uid=%d err=%v anti=%t size=%d\n", r.UID, err, packet.isAnti, packet.size)
+			foundationlog.Robotf("[PARTY_INFO_PARSE_ERROR] uid=%d err=%v anti=%t size=%d\n", r.UID, err, packet.isAnti, packet.size)
 		} else {
 			r.rememberPartyRecvSourceUnsafe(source)
 			if clears {
@@ -73,7 +75,7 @@ func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
 		self, peers, source, err := selectPartyIPInfoPacket(r.Cipher, packet.data, packet.isAnti, uint32(r.UID))
 		if err != nil {
 			recordPartyDebugPacket(r.UID, 0, "RX", "GAME", "SNAPSHOT_PARSE", "FAIL", err.Error()+" candidates="+partyIPInfoDebugSummary(r.Cipher, packet.data, packet.isAnti), packet.data)
-			fmt.Printf("[PARTY_IPINFO_PARSE_ERROR] uid=%d err=%v anti=%t size=%d candidates=%s\n",
+			foundationlog.Robotf("[PARTY_IPINFO_PARSE_ERROR] uid=%d err=%v anti=%t size=%d candidates=%s\n",
 				r.UID, err, packet.isAnti, packet.size, partyIPInfoDebugSummary(r.Cipher, packet.data, packet.isAnti))
 			return
 		}
@@ -85,7 +87,7 @@ func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
 			fmt.Sprintf("source=%s self=s%d/a%d/u%d/%s>%s:%d peers=%s", source, self.slot, self.accID, self.uniqueID, self.innerIP, self.outerIP, self.port, strings.Join(peerAccounts, ",")), packet.data)
 		r.rememberPartyRecvSourceUnsafe(source)
 		if source == recvBodySourcePlain {
-			fmt.Printf("[PARTY_IPINFO_PLAIN] uid=%d size=%d\n", r.UID, packet.size)
+			foundationlog.Robotf("[PARTY_IPINFO_PLAIN] uid=%d size=%d\n", r.UID, packet.size)
 		}
 		tracePartyIPInfo(r.UID, self, peers)
 		r.partyRealtimeCandidate = [4]uint16{}
@@ -110,7 +112,7 @@ func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
 		identities, _, err := selectPartyRealtimeInfoPacket(r.Cipher, packet.data, packet.isAnti)
 		if err != nil {
 			recordPartyDebugPacket(r.UID, 0, "--", "GAME", "REALTIME_PARSE", "FAIL", err.Error(), nil)
-			fmt.Printf("[PARTY_REALTIME_PARSE_ERROR] uid=%d err=%v anti=%t size=%d\n", r.UID, err, packet.isAnti, packet.size)
+			foundationlog.Robotf("[PARTY_REALTIME_PARSE_ERROR] uid=%d err=%v anti=%t size=%d\n", r.UID, err, packet.isAnti, packet.size)
 			return
 		}
 		r.rememberPartyRealtimeIdentitiesUnsafe(identities)
@@ -157,14 +159,14 @@ func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
 		selected, alternate, err := selectPeerResponsePackets(r.Cipher, packet.data, packet.isAnti, r.partyRecvSource, r.partyConfirmedPeerUnsafe)
 		if err != nil {
 			recordPartyDebugPacket(r.UID, 0, "--", "GAME", "INVITE_PARSE", "FAIL", err.Error(), nil)
-			fmt.Printf("[PEER_REQUEST_PARSE_ERROR] uid=%d err=%v anti=%t size=%d\n", r.UID, err, packet.isAnti, packet.size)
+			foundationlog.Robotf("[PEER_REQUEST_PARSE_ERROR] uid=%d err=%v anti=%t size=%d\n", r.UID, err, packet.isAnti, packet.size)
 			return
 		}
 		data, typ, source := selected.data, selected.typ, selected.source
 		recordPartyDebugPacket(r.UID, 0, "--", "GAME", "INVITE_PARSE", "OK",
 			fmt.Sprintf("source=%s request_type=%d peer_unique=%d request_id=%d alternate=%t", source, typ, binary.LittleEndian.Uint16(data[0:2]), binary.LittleEndian.Uint32(data[3:7]), alternate != nil), data)
 		if source == recvBodySourcePlain {
-			fmt.Printf("[PEER_REQUEST_PLAIN] uid=%d size=%d\n", r.UID, packet.size)
+			foundationlog.Robotf("[PEER_REQUEST_PLAIN] uid=%d size=%d\n", r.UID, packet.size)
 		}
 		r.rememberPartyRecvSourceUnsafe(source)
 		if typ == peerRequestParty || (!r.LastTradeState && r.LastTradeID == 0) {
@@ -173,7 +175,7 @@ func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
 			r.PacketID++
 			if err != nil {
 				recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "ACCEPT", "FAIL", fmt.Sprintf("build request_type=%d err=%v", typ, err), nil)
-				fmt.Printf("[PEER_RESPONSE_BUILD_ERROR] uid=%d type=%d err=%v\n", r.UID, typ, err)
+				foundationlog.Robotf("[PEER_RESPONSE_BUILD_ERROR] uid=%d type=%d err=%v\n", r.UID, typ, err)
 			}
 			if err == nil {
 				sent := r.sendRaw(pkt)
@@ -188,7 +190,7 @@ func (r *RobotVo) handlePartyPacketUnsafe(packet robotInboundPacket) {
 					r.LastTradeState = true
 				}
 				if sent && typ == peerRequestParty {
-					fmt.Printf("[PARTY_AUTO_ACCEPT] uid=%d peer_unique_id=%d request_id=%d\n",
+					foundationlog.Robotf("[PARTY_AUTO_ACCEPT] uid=%d peer_unique_id=%d request_id=%d\n",
 						r.UID, uniqueID, binary.LittleEndian.Uint32(data[3:7]))
 					r.setPartyPendingUnsafe(uniqueID)
 					r.ensurePartyRelayUnsafe()
@@ -213,6 +215,6 @@ func tracePartyIPInfo(uid uint32, self partyIPPeer, peers []partyIPPeer) {
 		}
 		peerText += fmt.Sprintf("slot%d:acc%d:uid%d:port%d", peer.slot, peer.accID, peer.uniqueID, peer.port)
 	}
-	fmt.Printf("[PARTY_IPINFO] uid=%d self_slot=%d self_acc=%d self_unique=%d self_port=%d peers=%s\n",
+	foundationlog.Robotf("[PARTY_IPINFO] uid=%d self_slot=%d self_acc=%d self_unique=%d self_port=%d peers=%s\n",
 		uid, self.slot, self.accID, self.uniqueID, self.port, peerText)
 }

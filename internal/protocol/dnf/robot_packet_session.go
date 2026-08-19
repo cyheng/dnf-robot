@@ -2,7 +2,7 @@ package dnf
 
 import (
 	"encoding/binary"
-	"fmt"
+	foundationlog "robot/internal/foundation/log"
 )
 
 func (r *RobotVo) handleSessionPacketUnsafe(packet robotInboundPacket) {
@@ -15,11 +15,11 @@ func (r *RobotVo) handleSessionPacketUnsafe(packet robotInboundPacket) {
 		var checksums [8]byte
 		pkt, err := buildSendPacket(0, uint16(r.PacketID), checksums[:], r.Cipher)
 		if err != nil {
-			fmt.Printf("[SESSION_CHECK_RESPONSE_ERROR] uid=%d stage=build err=%v\n", r.UID, err)
+			foundationlog.Robotf("[SESSION_CHECK_RESPONSE_ERROR] uid=%d stage=build err=%v\n", r.UID, err)
 			return
 		}
 		if !r.sendRaw(pkt) {
-			fmt.Printf("[SESSION_CHECK_RESPONSE_ERROR] uid=%d stage=send\n", r.UID)
+			foundationlog.Robotf("[SESSION_CHECK_RESPONSE_ERROR] uid=%d stage=send\n", r.UID)
 			return
 		}
 		r.PacketID++

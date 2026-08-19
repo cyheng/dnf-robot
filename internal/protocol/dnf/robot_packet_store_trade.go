@@ -2,7 +2,7 @@ package dnf
 
 import (
 	"encoding/binary"
-	"fmt"
+	foundationlog "robot/internal/foundation/log"
 )
 
 func (r *RobotVo) handleStoreTradePacketUnsafe(packet robotInboundPacket) {
@@ -13,7 +13,7 @@ func (r *RobotVo) handleStoreTradePacketUnsafe(packet robotInboundPacket) {
 		}
 		_, _, decData, err := parseRecvPacket(r.Cipher, packet.data, packet.isAnti)
 		if err != nil {
-			fmt.Printf("[DISJOINT_238_PARSE_ERROR] uid=%d err=%v size=%d anti=%t\n", r.UID, err, len(packet.data), packet.isAnti)
+			foundationlog.Robotf("[DISJOINT_238_PARSE_ERROR] uid=%d err=%v size=%d anti=%t\n", r.UID, err, len(packet.data), packet.isAnti)
 		} else {
 			if len(decData) > 0 && decData[0] == 1 {
 				r.DisjointDirectAck = true
@@ -67,13 +67,13 @@ func (r *RobotVo) handleStoreTradePacketUnsafe(packet robotInboundPacket) {
 				r.StoreDisplayRejected = false
 				r.LastStoreError = 0
 			} else if !r.StoreDisplayAck {
-				fmt.Printf("[STORE_CMD90_NACK] uid=%d error=0x%02x items=%d entries=%s\n", r.UID, storeErr, len(r.LastStoreDisplay), formatStoreDisplayItems(r.LastStoreDisplay))
+				foundationlog.Robotf("[STORE_CMD90_NACK] uid=%d error=0x%02x items=%d entries=%s\n", r.UID, storeErr, len(r.LastStoreDisplay), formatStoreDisplayItems(r.LastStoreDisplay))
 				if storeErr == 0x11 && r.retryPrivateStoreDisplayUnsafe() {
 					return
 				}
 				r.StoreDisplayRejected = true
 				r.LastStoreError = storeErr
-				fmt.Printf("[STORE_90_REJECT] uid=%d error=0x%02x items=%d\n", r.UID, storeErr, len(r.LastStoreDisplay))
+				foundationlog.Robotf("[STORE_90_REJECT] uid=%d error=0x%02x items=%d\n", r.UID, storeErr, len(r.LastStoreDisplay))
 			}
 		}
 
@@ -114,7 +114,7 @@ func (r *RobotVo) handleStoreTradePacketUnsafe(packet robotInboundPacket) {
 			r.storeInventoryVersion++
 			r.IsWaitingItemList = false
 		} else {
-			fmt.Printf("[STORE_CMD13_ERROR] uid=%d err=%v bytes=%d\n", r.UID, err, len(decData))
+			foundationlog.Robotf("[STORE_CMD13_ERROR] uid=%d err=%v bytes=%d\n", r.UID, err, len(decData))
 		}
 	case 15:
 		if packet.flag != 0 || r.State != StateRun {
