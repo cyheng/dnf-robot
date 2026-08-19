@@ -2,9 +2,10 @@ package dnf
 
 import (
 	"encoding/binary"
-	"fmt"
 	"robot/internal/shared"
 	"time"
+
+	foundationlog "robot/internal/foundation/log"
 )
 
 func (r *RobotVo) handleLoginPacketUnsafe(packet robotInboundPacket) {
@@ -15,7 +16,7 @@ func (r *RobotVo) handleLoginPacketUnsafe(packet robotInboundPacket) {
 		}
 		if packet.flag == 1 {
 			if packet.size < 15 {
-				fmt.Printf("[RobotVo] short encrypted packet uid=%d size=%d\n", r.UID, packet.size)
+				foundationlog.Robotf("[RobotVo] short encrypted packet uid=%d size=%d\n", r.UID, packet.size)
 				r.State = StateStop
 				if r.Conn != nil {
 					r.Conn.Close()
@@ -54,7 +55,7 @@ func (r *RobotVo) handleLoginPacketUnsafe(packet robotInboundPacket) {
 				if err == nil {
 					r.sendRaw(pkt)
 				} else {
-					fmt.Printf("[RobotVo] LOGIN SEND ERR: %v\n", err)
+					foundationlog.Robotf("[RobotVo] LOGIN SEND ERR: %v\n", err)
 				}
 			}
 		}
@@ -83,7 +84,7 @@ func (r *RobotVo) handleLoginPacketUnsafe(packet robotInboundPacket) {
 			return
 		}
 		if !shared.GenericAreaAllowed(r.GuildID, int(r.CurVillage)) {
-			fmt.Printf("[AreaPolicy] blocked unsafe login uid=%d cid=%d guild_id=%d village=%d area=%d\n",
+			foundationlog.Robotf("[AreaPolicy] blocked unsafe login uid=%d cid=%d guild_id=%d village=%d area=%d\n",
 				r.UID, r.CID, r.GuildID, r.CurVillage, r.CurArea)
 			r.closeOutUnsafe()
 			return

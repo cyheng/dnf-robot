@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	foundationlog "robot/internal/foundation/log"
 	"robot/internal/protocol/dnf/crypt"
 )
 
@@ -312,7 +313,7 @@ type partyInviteFallbackState struct {
 func (r *RobotVo) partyActiveUnsafe() bool {
 	if r.partyPendingPeer != 0 && (r.partyPendingUntil.IsZero() || !time.Now().Before(r.partyPendingUntil)) {
 		recordPartyDebugPacket(r.UID, 0, "--", "GAME", "SNAPSHOT_WAIT", "TIMEOUT", fmt.Sprintf("peer_unique=%d wait=%s", r.partyPendingPeer, partyPendingTimeout), nil)
-		fmt.Printf("[PARTY_SNAPSHOT_TIMEOUT] uid=%d peer_unique_id=%d wait=%s\n", r.UID, r.partyPendingPeer, partyPendingTimeout)
+		foundationlog.Robotf("[PARTY_SNAPSHOT_TIMEOUT] uid=%d peer_unique_id=%d wait=%s\n", r.UID, r.partyPendingPeer, partyPendingTimeout)
 		r.clearPartyPendingUnsafe()
 	}
 	for _, peer := range r.partyPeers {
@@ -393,12 +394,12 @@ func (r *RobotVo) flushPartyInviteFallbackUnsafe(now time.Time, epoch uint64) bo
 	r.PacketID++
 	if err != nil {
 		recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "ACCEPT_FALLBACK", "FAIL", "build: "+err.Error(), nil)
-		fmt.Printf("[PARTY_FALLBACK_BUILD_ERROR] uid=%d err=%v\n", r.UID, err)
+		foundationlog.Robotf("[PARTY_FALLBACK_BUILD_ERROR] uid=%d err=%v\n", r.UID, err)
 		return false
 	}
 	if !r.sendRaw(pkt) {
 		recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "ACCEPT_FALLBACK", "FAIL", "send rejected", pkt)
-		fmt.Printf("[PARTY_FALLBACK_SEND_ERROR] uid=%d\n", r.UID)
+		foundationlog.Robotf("[PARTY_FALLBACK_SEND_ERROR] uid=%d\n", r.UID)
 		return false
 	}
 	if fallback.primaryType == peerRequestTrade && r.LastTradeState && r.LastTradeID == fallback.primaryPeer {
@@ -411,7 +412,7 @@ func (r *RobotVo) flushPartyInviteFallbackUnsafe(now time.Time, epoch uint64) bo
 	r.ensurePartyRelayUnsafe()
 	recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "ACCEPT_FALLBACK", "OK",
 		fmt.Sprintf("peer_unique=%d request_id=%d source=%s", uniqueID, binary.LittleEndian.Uint32(fallback.data[3:7]), fallback.source), pkt)
-	fmt.Printf("[PARTY_FALLBACK_ACCEPT] uid=%d peer_unique_id=%d request_id=%d source=%s\n",
+	foundationlog.Robotf("[PARTY_FALLBACK_ACCEPT] uid=%d peer_unique_id=%d request_id=%d source=%s\n",
 		r.UID, uniqueID, binary.LittleEndian.Uint32(fallback.data[3:7]), fallback.source)
 	return true
 }
@@ -566,7 +567,7 @@ func (r *RobotVo) applyPartyRealtimeIdentitiesUnsafe() {
 		r.setPartyPeersUnsafe(peers)
 	}
 	if selfRecovered {
-		fmt.Printf("[PARTY_SELF_ID_RECOVERED] uid=%d slot=%d unique=%d source=realtime\n", r.UID, r.partySelfPeer.slot, r.partySelfPeer.uniqueID)
+		foundationlog.Robotf("[PARTY_SELF_ID_RECOVERED] uid=%d slot=%d unique=%d source=realtime\n", r.UID, r.partySelfPeer.slot, r.partySelfPeer.uniqueID)
 	}
 }
 
