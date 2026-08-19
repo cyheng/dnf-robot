@@ -6,6 +6,8 @@ import (
 	"io"
 	"net"
 	"time"
+
+	foundationlog "robot/internal/foundation/log"
 )
 
 const (
@@ -24,12 +26,12 @@ func (r *RobotVo) sendPartyOptionUnsafe() bool {
 	r.PacketID++
 	if err != nil {
 		recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "PARTY_OPTION", "FAIL", "build: "+err.Error(), nil)
-		fmt.Printf("[PARTY_OPTION_BUILD_ERROR] uid=%d err=%v\n", r.UID, err)
+		foundationlog.Robotf("[PARTY_OPTION_BUILD_ERROR] uid=%d err=%v\n", r.UID, err)
 		return false
 	}
 	if !r.sendRaw(pkt) {
 		recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "PARTY_OPTION", "FAIL", "send rejected", pkt)
-		fmt.Printf("[PARTY_OPTION_SEND_ERROR] uid=%d\n", r.UID)
+		foundationlog.Robotf("[PARTY_OPTION_SEND_ERROR] uid=%d\n", r.UID)
 		return false
 	}
 	recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "PARTY_OPTION", "OK", "allow_party_and_guild options sent", pkt)
@@ -72,12 +74,12 @@ func (r *RobotVo) sendNATInfoUpdateUnsafe(force bool) bool {
 	r.PacketID++
 	if err != nil {
 		recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "NAT_INFO", "FAIL", "build: "+err.Error(), nil)
-		fmt.Printf("[NAT_BUILD_ERROR] uid=%d err=%v\n", r.UID, err)
+		foundationlog.Robotf("[NAT_BUILD_ERROR] uid=%d err=%v\n", r.UID, err)
 		return false
 	}
 	if !r.sendRaw(pkt) {
 		recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "NAT_INFO", "FAIL", "send rejected", pkt)
-		fmt.Printf("[NAT_SEND_ERROR] uid=%d\n", r.UID)
+		foundationlog.Robotf("[NAT_SEND_ERROR] uid=%d\n", r.UID)
 		return false
 	}
 	recordPartyDebugPacket(r.UID, 0, "TX", "GAME", "NAT_INFO", "OK", fmt.Sprintf("ip=%s port=%d mtu=%d", udpAddr.IP, udpAddr.Port, mtu), pkt)

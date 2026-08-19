@@ -2,9 +2,10 @@ package dnf
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"time"
+
+	foundationlog "robot/internal/foundation/log"
 )
 
 const (
@@ -31,11 +32,11 @@ func (r *RobotVo) startPartyUDPUnsafe(addr *net.TCPAddr) bool {
 		fallback := &net.UDPAddr{IP: addr.IP}
 		conn, err = net.ListenUDP("udp4", fallback)
 		if err != nil {
-			fmt.Printf("[PARTY_UDP_LISTEN_ERROR] uid=%d ip=%s port=%d err=%v\n", r.UID, addr.IP.String(), addr.Port, err)
+			foundationlog.Robotf("[PARTY_UDP_LISTEN_ERROR] uid=%d ip=%s port=%d err=%v\n", r.UID, addr.IP.String(), addr.Port, err)
 			return false
 		}
 		actual := conn.LocalAddr().(*net.UDPAddr)
-		fmt.Printf("[PARTY_UDP_PORT_FALLBACK] uid=%d requested=%d actual=%d\n", r.UID, addr.Port, actual.Port)
+		foundationlog.Robotf("[PARTY_UDP_PORT_FALLBACK] uid=%d requested=%d actual=%d\n", r.UID, addr.Port, actual.Port)
 	}
 	r.partyUDPConn = conn
 	localIP := conn.LocalAddr().(*net.UDPAddr).IP
@@ -107,7 +108,7 @@ func (r *RobotVo) partyUDPLoop(conn *net.UDPConn, uid uint32, generation uint64)
 				readErrorSince = now
 			}
 			if readErrorLogAt.IsZero() || !now.Before(readErrorLogAt) {
-				fmt.Printf("[PARTY_UDP_READ_ERROR] uid=%d err=%v\n", uid, err)
+				foundationlog.Robotf("[PARTY_UDP_READ_ERROR] uid=%d err=%v\n", uid, err)
 				readErrorLogAt = now.Add(partyUDPReadErrorLogGap)
 			}
 			if now.Sub(readErrorSince) >= partyUDPReadRecycleAfter {
@@ -115,7 +116,7 @@ func (r *RobotVo) partyUDPLoop(conn *net.UDPConn, uid uint32, generation uint64)
 					r.partyUDPRunning = false
 				}
 				r.mu.Unlock()
-				fmt.Printf("[PARTY_UDP_RECYCLE] uid=%d err=%v\n", uid, err)
+				foundationlog.Robotf("[PARTY_UDP_RECYCLE] uid=%d err=%v\n", uid, err)
 				return
 			}
 			r.mu.Unlock()
@@ -132,7 +133,7 @@ func (r *RobotVo) partyUDPLoop(conn *net.UDPConn, uid uint32, generation uint64)
 		if shouldReplyPartyUDP(conn, remote) {
 			replies, groupErr := groupPartyTransportFrames(r.buildPartyUDPAcks(payload, remote), mtu)
 			if groupErr != nil {
-				fmt.Printf("[PARTY_UDP_ACK_ERROR] uid=%d remote=%s err=%v\n", uid, remote.String(), groupErr)
+				foundationlog.Robotf("[PARTY_UDP_ACK_ERROR] uid=%d remote=%s err=%v\n", uid, remote.String(), groupErr)
 				continue
 			}
 			for _, reply := range replies {
@@ -173,7 +174,7 @@ func writePartyUDPReply(conn *net.UDPConn, payload []byte, remote *net.UDPAddr, 
 	}
 	if err := writePartyUDPDatagramWithMTU(conn, payload, remote, mtu); err != nil {
 		recordPartyTransportFrames(uid, 0, "TX", "UDP", 1, "FAIL", "dst="+remote.String(), payload)
-		fmt.Printf("[PARTY_UDP_ACK_ERROR] uid=%d remote=%s err=%v\n", uid, remote.String(), err)
+		foundationlog.Robotf("[PARTY_UDP_ACK_ERROR] uid=%d remote=%s err=%v\n", uid, remote.String(), err)
 		return
 	}
 	recordPartyTransportFrames(uid, 0, "TX", "UDP", 1, "OK", "dst="+remote.String(), payload)

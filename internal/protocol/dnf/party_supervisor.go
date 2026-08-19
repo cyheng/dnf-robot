@@ -1,9 +1,10 @@
 package dnf
 
 import (
-	"fmt"
 	"net"
 	"time"
+
+	foundationlog "robot/internal/foundation/log"
 )
 
 const (
@@ -40,7 +41,7 @@ func (r *RobotVo) partySupervisorLoop(epoch uint64, uid uint32) {
 				r.partySupervisorRun = false
 			}
 			r.mu.Unlock()
-			fmt.Printf("[PARTY_SUPERVISOR_PANIC] uid=%d err=%v\n", uid, rec)
+			foundationlog.Robotf("[PARTY_SUPERVISOR_PANIC] uid=%d err=%v\n", uid, rec)
 		}
 	}()
 	var nextMaintenance time.Time
@@ -93,7 +94,7 @@ func (r *RobotVo) refreshPartySelfIdentityUnsafe(now time.Time) {
 			r.partySelfRefreshAttempts = 0
 			r.partySelfRefreshBackoff = 0
 			sent = true
-			fmt.Printf("[PARTY_SELF_ID_RECYCLE] uid=%d slot=%d\n", r.UID, self.slot)
+			foundationlog.Robotf("[PARTY_SELF_ID_RECYCLE] uid=%d slot=%d\n", r.UID, self.slot)
 		}
 	}
 	if !sent {
@@ -103,7 +104,7 @@ func (r *RobotVo) refreshPartySelfIdentityUnsafe(now time.Time) {
 		if r.partySelfRefreshAttempts < 0xff {
 			r.partySelfRefreshAttempts++
 		}
-		fmt.Printf("[PARTY_SELF_ID_REFRESH] uid=%d slot=%d\n", r.UID, self.slot)
+		foundationlog.Robotf("[PARTY_SELF_ID_REFRESH] uid=%d slot=%d\n", r.UID, self.slot)
 	}
 	if r.partySelfRefreshBackoff <= 0 {
 		r.partySelfRefreshBackoff = partySelfRefreshInitial
@@ -149,7 +150,7 @@ func (r *RobotVo) rebuildPartyUDPUnsafe(uid uint32, reason string) bool {
 	}
 	r.natInfoSent = false
 	if r.sendNATInfoUnsafe() {
-		fmt.Printf("[PARTY_UDP_RECOVERED] uid=%d reason=%s\n", uid, reason)
+		foundationlog.Robotf("[PARTY_UDP_RECOVERED] uid=%d reason=%s\n", uid, reason)
 		return true
 	}
 	return false
