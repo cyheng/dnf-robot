@@ -96,7 +96,7 @@ func logStringLocked(msg string) {
 	n, err := logWriter.WriteString(prefix)
 	logSize += int64(n)
 	if err != nil {
-		fmt.Printf("[Log] write failed path=%s err=%v\n", logName, err)
+		_, _ = fmt.Fprintf(os.Stderr, "[Log] write failed path=%s err=%v\n", logName, err)
 	}
 }
 
@@ -112,19 +112,19 @@ func rotateLogIfNeededLocked(nextBytes int) {
 	logFile = nil
 	logWriter = nil
 	if err := logfile.Rotate(logName, logBackups); err != nil {
-		fmt.Printf("[Log] rotate failed path=%s err=%v\n", logName, err)
+		_, _ = fmt.Fprintf(os.Stderr, "[Log] rotate failed path=%s err=%v\n", logName, err)
 	}
 	var openErr error
 	logFile, openErr = os.OpenFile(logName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if openErr != nil {
-		fmt.Printf("[Log] reopen failed path=%s err=%v\n", logName, openErr)
+		_, _ = fmt.Fprintf(os.Stderr, "[Log] reopen failed path=%s err=%v\n", logName, openErr)
 		logFile = nil
 		logSize = 0
 		return
 	}
 	info, err := logFile.Stat()
 	if err != nil {
-		fmt.Printf("[Log] stat failed path=%s err=%v\n", logName, err)
+		_, _ = fmt.Fprintf(os.Stderr, "[Log] stat failed path=%s err=%v\n", logName, err)
 		_ = logFile.Close()
 		logFile = nil
 		logSize = 0
@@ -180,12 +180,12 @@ func flushLogLocked(sync bool) {
 		return
 	}
 	if err := logWriter.Flush(); err != nil {
-		fmt.Printf("[Log] flush failed path=%s err=%v\n", logName, err)
+		_, _ = fmt.Fprintf(os.Stderr, "[Log] flush failed path=%s err=%v\n", logName, err)
 		return
 	}
 	if sync {
 		if err := logFile.Sync(); err != nil {
-			fmt.Printf("[Log] sync failed path=%s err=%v\n", logName, err)
+			_, _ = fmt.Fprintf(os.Stderr, "[Log] sync failed path=%s err=%v\n", logName, err)
 		}
 	}
 }
