@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	foundationlog "robot/internal/foundation/log"
 	"strings"
 	"time"
 )
@@ -71,7 +72,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.storeSessionTokenLocked(token, now.Add(12*time.Hour))
 		active := len(s.tokens)
 		s.tokenMu.Unlock()
-		fmt.Printf("[WebAdmin] session created pid=%d active=%d remote=%s\n", os.Getpid(), active, r.RemoteAddr)
+		foundationlog.Robotf("WEB_SESSION_CREATED pid=%d active=%d remote=%s\n", os.Getpid(), active, r.RemoteAddr)
 		http.SetCookie(w, &http.Cookie{Name: "tw_web_token", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -185,7 +186,7 @@ func (s *Server) authed(r *http.Request) bool {
 		return false
 	}
 	if c.Value == "" {
-		fmt.Printf("[WebAdmin] auth rejected pid=%d reason=empty_token path=%s remote=%s\n", os.Getpid(), r.URL.Path, r.RemoteAddr)
+		foundationlog.Robotf("WEB_AUTH_REJECTED pid=%d reason=empty_token path=%s remote=%s\n", os.Getpid(), r.URL.Path, r.RemoteAddr)
 		return false
 	}
 	now := time.Now()
@@ -202,7 +203,7 @@ func (s *Server) authed(r *http.Request) bool {
 	active := len(s.tokens)
 	s.tokenMu.Unlock()
 	if !ok {
-		fmt.Printf("[WebAdmin] auth rejected pid=%d reason=unknown_or_expired_token active=%d path=%s remote=%s\n", os.Getpid(), active, r.URL.Path, r.RemoteAddr)
+		foundationlog.Robotf("WEB_AUTH_REJECTED pid=%d reason=unknown_or_expired_token active=%d path=%s remote=%s\n", os.Getpid(), active, r.URL.Path, r.RemoteAddr)
 	}
 	return ok
 }

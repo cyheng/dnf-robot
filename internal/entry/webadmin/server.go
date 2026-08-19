@@ -13,6 +13,7 @@ import (
 
 	"robot/internal/foundation/config"
 	"robot/internal/foundation/lockhub"
+	foundationlog "robot/internal/foundation/log"
 )
 
 type Server struct {
@@ -96,12 +97,12 @@ func (s *Server) Serve(ctx context.Context) error {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	fmt.Printf("[WebAdmin] listening on %s, robot=%s pid=%d sessions=%d\n", s.webAddr, s.robotAddr, os.Getpid(), s.sessionCount())
+	foundationlog.Robotf("WEB_SERVER_LISTENING addr=%s robot_addr=%s pid=%d sessions=%d\n", s.webAddr, s.robotAddr, os.Getpid(), s.sessionCount())
 	if strings.TrimSpace(s.cfg.WebPassword) == "twadmin" {
-		fmt.Printf("[WebAdmin] SECURITY WARNING: default web password is in use; change WebPassword before exposing this service\n")
+		foundationlog.Robotf("WEB_SECURITY_WARNING reason=default_password\n")
 	}
 	if host, _, err := net.SplitHostPort(s.webAddr); err == nil && (host == "" || host == "0.0.0.0" || host == "::") {
-		fmt.Printf("[WebAdmin] SECURITY WARNING: web admin is listening on all interfaces addr=%s\n", s.webAddr)
+		foundationlog.Robotf("WEB_SECURITY_WARNING reason=all_interfaces addr=%s\n", s.webAddr)
 	}
 	serveDone := make(chan struct{})
 	go func() {
@@ -111,9 +112,9 @@ func (s *Server) Serve(ctx context.Context) error {
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := server.Shutdown(shutdownCtx); err != nil {
-				fmt.Printf("[WebAdmin] graceful shutdown failed: %v\n", err)
+				foundationlog.Robotf("WEB_SERVER_SHUTDOWN_FAILED phase=graceful err=%v\n", err)
 				if closeErr := server.Close(); closeErr != nil {
-					fmt.Printf("[WebAdmin] forced close failed: %v\n", closeErr)
+					foundationlog.Robotf("WEB_SERVER_SHUTDOWN_FAILED phase=forced err=%v\n", closeErr)
 				}
 			}
 		case <-serveDone:

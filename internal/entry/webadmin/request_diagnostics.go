@@ -1,9 +1,9 @@
 package webadmin
 
 import (
-	"fmt"
 	"net/http"
 	"os"
+	foundationlog "robot/internal/foundation/log"
 	"runtime/debug"
 	"time"
 )
@@ -44,7 +44,7 @@ func reportResponseWriteError(w http.ResponseWriter, err error) {
 		recorder.recordWriteError(err)
 		return
 	}
-	fmt.Printf("[WebAdmin] response_write_error err=%v\n", err)
+	foundationlog.Robotf("WEB_RESPONSE_WRITE_ERROR err=%v\n", err)
 }
 
 func (s *Server) withDiagnostics(next http.Handler) http.Handler {
@@ -54,7 +54,7 @@ func (s *Server) withDiagnostics(next http.Handler) http.Handler {
 		defer func() {
 			duration := time.Since(start)
 			if v := recover(); v != nil {
-				fmt.Printf("[WebAdmin] panic pid=%d method=%s path=%s remote=%s duration=%s err=%v\n%s\n", os.Getpid(), r.Method, r.URL.Path, r.RemoteAddr, duration.Round(time.Millisecond), v, debug.Stack())
+				foundationlog.Robotf("WEB_REQUEST_PANIC pid=%d method=%s path=%s remote=%s duration=%s err=%v stack=%s\n", os.Getpid(), r.Method, r.URL.Path, r.RemoteAddr, duration.Round(time.Millisecond), v, debug.Stack())
 				http.Error(rec, "internal server error", http.StatusInternalServerError)
 			}
 			status := rec.status
@@ -62,10 +62,10 @@ func (s *Server) withDiagnostics(next http.Handler) http.Handler {
 				status = http.StatusOK
 			}
 			if rec.writeErr != nil {
-				fmt.Printf("[WebAdmin] response_write_error pid=%d method=%s path=%s status=%d bytes=%d duration=%s remote=%s err=%v\n", os.Getpid(), r.Method, r.URL.Path, status, rec.bytes, duration.Round(time.Millisecond), r.RemoteAddr, rec.writeErr)
+				foundationlog.Robotf("WEB_RESPONSE_WRITE_ERROR pid=%d method=%s path=%s status=%d bytes=%d duration=%s remote=%s err=%v\n", os.Getpid(), r.Method, r.URL.Path, status, rec.bytes, duration.Round(time.Millisecond), r.RemoteAddr, rec.writeErr)
 			}
 			if status >= 500 || duration > 3*time.Second {
-				fmt.Printf("[WebAdmin] request pid=%d method=%s path=%s status=%d bytes=%d duration=%s remote=%s\n", os.Getpid(), r.Method, r.URL.Path, status, rec.bytes, duration.Round(time.Millisecond), r.RemoteAddr)
+				foundationlog.Robotf("WEB_REQUEST_SLOW_OR_FAILED pid=%d method=%s path=%s status=%d bytes=%d duration=%s remote=%s\n", os.Getpid(), r.Method, r.URL.Path, status, rec.bytes, duration.Round(time.Millisecond), r.RemoteAddr)
 			}
 		}()
 		next.ServeHTTP(rec, r)
