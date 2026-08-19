@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	foundationlog "robot/internal/foundation/log"
 	sqlpkg "robot/internal/foundation/sql"
 )
 
@@ -333,7 +334,7 @@ func (r *RobotVo) MarkPrivateStoreDisplayFailed() {
 	}
 	r.StoreDisplayRejected = true
 	r.LastStoreError = 0
-	fmt.Printf("[STORE_INVENTORY_NOT_READY] uid=%d inventory=%d entries=%s\n", r.UID, len(r.InfanMap), formatStoreInventory(r.InfanMap, 24))
+	foundationlog.Robotf("[STORE_INVENTORY_NOT_READY] uid=%d inventory=%d entries=%s\n", r.UID, len(r.InfanMap), formatStoreInventory(r.InfanMap, 24))
 }
 
 func (r *RobotVo) GetDbDataAndCompleteDisplay() bool {
@@ -369,12 +370,12 @@ func (r *RobotVo) GetDbDataAndCompleteDisplay() bool {
 				source = "prepared_db"
 			}
 		} else {
-			fmt.Printf("[STORE_PREPARED_INVENTORY_ERROR] uid=%d err=%v\n", uid, loadErr)
+			foundationlog.Robotf("[STORE_PREPARED_INVENTORY_ERROR] uid=%d err=%v\n", uid, loadErr)
 		}
 	}
 	wanted := min(len(rows), privateStoreDisplayLimit)
 	if len(storeInfo) < wanted {
-		fmt.Printf("[STORE_DISPLAY_DEGRADED] uid=%d source=%s rows=%d items=%d entries=%s\n", uid, source, len(rows), len(storeInfo), formatStoreDisplayItems(storeInfo))
+		foundationlog.Robotf("[STORE_DISPLAY_DEGRADED] uid=%d source=%s rows=%d items=%d entries=%s\n", uid, source, len(rows), len(storeInfo), formatStoreDisplayItems(storeInfo))
 	}
 
 	if len(storeInfo) == 0 {

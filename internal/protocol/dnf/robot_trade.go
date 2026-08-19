@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"strconv"
 	"time"
 
+	foundationlog "robot/internal/foundation/log"
 	sqlpkg "robot/internal/foundation/sql"
 )
 
@@ -96,7 +96,7 @@ func (r *RobotVo) refreshTradeQuote() {
 			uid := r.UID
 			task := r.Controller
 			r.mu.Unlock()
-			fmt.Printf("[TRADE_QUOTE_PANIC] uid=%d attempt=%d retry=%t err=%v\n", uid, attempt, shouldRetry, rec)
+			foundationlog.Robotf("[TRADE_QUOTE_PANIC] uid=%d attempt=%d retry=%t err=%v\n", uid, attempt, shouldRetry, rec)
 			if shouldRetry {
 				delay := time.Duration(1<<(attempt-1)) * 100 * time.Millisecond
 				startRobotRoutine(task, "trade_quote_retry", uid, func() {
@@ -144,7 +144,7 @@ func (r *RobotVo) refreshTradeQuote() {
 			return
 		}
 		if err != nil {
-			fmt.Printf("getShopVo query error: %v\n", err)
+			foundationlog.Robotf("getShopVo query error: %v\n", err)
 			prices = nil
 		}
 		r.applyTradeQuoteUnsafe(calculateTradeQuote(snapshot, prices))

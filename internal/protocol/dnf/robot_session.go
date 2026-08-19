@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/binary"
-	"fmt"
 	"net"
 	"strconv"
 	"sync/atomic"
 	"time"
 
 	"robot/internal/foundation/lockhub"
+	foundationlog "robot/internal/foundation/log"
 	"robot/internal/protocol/dnf/crypt"
 )
 
@@ -564,7 +564,7 @@ func (r *RobotVo) connectContext(ctx context.Context, dial robotDialContextFunc)
 			r.mu.Unlock()
 			return
 		}
-		fmt.Printf("[RobotVo] connect failed uid=%d addr=%s err=%v\n", r.UID, addr, err)
+		foundationlog.Robotf("[RobotVo] connect failed uid=%d addr=%s err=%v\n", r.UID, addr, err)
 		r.mu.Lock()
 		r.connectInFlight = false
 		r.mu.Unlock()
@@ -643,7 +643,7 @@ func localIPAvailable(ip string) bool {
 func (r *RobotVo) readLoop(conn net.Conn) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			fmt.Printf("[RobotVo] readLoop panic uid=%d err=%v\n", r.UID, rec)
+			foundationlog.Robotf("[RobotVo] readLoop panic uid=%d err=%v\n", r.UID, rec)
 		}
 		r.finishReadLoop(conn)
 	}()
@@ -729,7 +729,7 @@ func (r *RobotVo) onRecvDataFrom(conn net.Conn, data []byte) {
 		packetSize := binary.LittleEndian.Uint32(packet[3:7])
 		const maxPacketSize uint32 = 1024 * 1024
 		if packetSize < 7 || packetSize > maxPacketSize {
-			fmt.Printf("[RobotVo] invalid packet uid=%d flag=%d type=%d size=%d recvSize=%d\n",
+			foundationlog.Robotf("[RobotVo] invalid packet uid=%d flag=%d type=%d size=%d recvSize=%d\n",
 				r.UID, packetFlag, packetType, packetSize, r.recvSize-consumed)
 			r.State = StateStop
 			if r.Conn != nil {
@@ -782,18 +782,18 @@ func (r *RobotVo) sendRaw(pkt []byte) bool {
 	}
 	for written := 0; written < len(pkt); {
 		if err := conn.SetWriteDeadline(time.Now().Add(robotSocketWriteTimeout)); err != nil {
-			fmt.Printf("[RobotVo] set write deadline failed uid=%d err=%v\n", r.UID, err)
+			foundationlog.Robotf("[RobotVo] set write deadline failed uid=%d err=%v\n", r.UID, err)
 			_ = conn.Close()
 			return false
 		}
 		n, err := conn.Write(pkt[written:])
 		if err != nil {
-			fmt.Printf("[RobotVo] write failed uid=%d err=%v\n", r.UID, err)
+			foundationlog.Robotf("[RobotVo] write failed uid=%d err=%v\n", r.UID, err)
 			_ = conn.Close()
 			return false
 		}
 		if n == 0 {
-			fmt.Printf("[RobotVo] write made no progress uid=%d\n", r.UID)
+			foundationlog.Robotf("[RobotVo] write made no progress uid=%d\n", r.UID)
 			_ = conn.Close()
 			return false
 		}
