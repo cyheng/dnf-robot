@@ -19,6 +19,7 @@ import (
 	"robot/internal/foundation/atomicfile"
 	"robot/internal/foundation/config"
 	"robot/internal/foundation/layout"
+	foundationlog "robot/internal/foundation/log"
 )
 
 //go:embed defaults/*
@@ -43,15 +44,15 @@ func Init(cfg *config.SysConfig) error {
 		return err
 	}
 	if changed, err := catalog.SyncPartySkillCatalog(paths.PartySkills(), paths.PVFSkillStates()); err != nil {
-		fmt.Printf("[Runtime] party skill switches unavailable: %v\n", err)
+		foundationlog.Robotf("RUNTIME_PARTY_SKILL_SWITCH_SYNC_FAILED path=%s err=%v\n", paths.PartySkills(), err)
 	} else if changed {
-		fmt.Printf("[Runtime] party skill switches synchronized from current PVF\n")
+		foundationlog.Robotf("RUNTIME_PARTY_SKILL_SWITCH_SYNCED path=%s source=pvf\n", paths.PartySkills())
 	}
 	if err := catalog.LoadPartySkills(paths.Templates); err != nil {
-		fmt.Printf("[Runtime] party skill catalog unavailable: %v\n", err)
+		foundationlog.Robotf("RUNTIME_PARTY_SKILL_CATALOG_LOAD_FAILED path=%s err=%v\n", paths.PartySkills(), err)
 	}
 	if err := updateRuntimeManifest(cfg); err != nil {
-		fmt.Printf("[Runtime] self-check manifest update skipped: %v\n", err)
+		foundationlog.Robotf("RUNTIME_MANIFEST_UPDATE_SKIPPED path=%s err=%v\n", filepath.Join(paths.PVF, "pvf_manifest.json"), err)
 	}
 	return nil
 }
