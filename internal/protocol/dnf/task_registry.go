@@ -1,7 +1,7 @@
 package dnf
 
 import (
-	"fmt"
+	foundationlog "robot/internal/foundation/log"
 	"time"
 )
 
@@ -41,7 +41,7 @@ func (t *RobotDnfTask) connectLoop() {
 				defer func() { <-t.connectSlots }()
 				defer func() {
 					if rec := recover(); rec != nil {
-						fmt.Printf("[RobotDnfTask] connect_panic uid=%d err=%v\n", vo.UID, rec)
+						foundationlog.Robotf("[RobotDnfTask] connect_panic uid=%d err=%v\n", vo.UID, rec)
 						func() {
 							defer func() { _ = recover() }()
 							vo.CloseOut()
@@ -126,7 +126,7 @@ func (t *RobotDnfTask) enqueueConnect(vo *RobotVo) bool {
 		return true
 	default:
 		t.connectMu.Unlock()
-		fmt.Printf("[RobotDnfTask] connect_queue_full uid=%d len=%d\n", vo.UID, len(t.connectQueue))
+		foundationlog.Robotf("[RobotDnfTask] connect_queue_full uid=%d len=%d\n", vo.UID, len(t.connectQueue))
 		return false
 	}
 }

@@ -1,8 +1,8 @@
 package dnf
 
 import (
-	"fmt"
 	"robot/internal/foundation/lockhub"
+	foundationlog "robot/internal/foundation/log"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -65,7 +65,7 @@ func (t *RobotDnfTask) dispatchLoop(shard *messageDispatchShard) {
 func (t *RobotDnfTask) handleMessage(msg MsgQueueData) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			fmt.Printf("[RobotDnfTask] message_panic type=%s err=%v\n%s", msg.Type, rec, debug.Stack())
+			foundationlog.Robotf("[RobotDnfTask] message_panic type=%s err=%v\n%s", msg.Type, rec, debug.Stack())
 		}
 	}()
 	handler, ok := t.keyToHandle[msg.Type]
@@ -137,10 +137,10 @@ func (t *RobotDnfTask) TryAddMessage(typ string, data interface{}) bool {
 		live := shard.liveQueue()
 		evict := oldestEvictableMessage(live)
 		if evict < 0 {
-			fmt.Printf("[RobotDnfTask] message_queue_full reject type=%s shard_len=%d\n", typ, len(live))
+			foundationlog.Robotf("[RobotDnfTask] message_queue_full reject type=%s shard_len=%d\n", typ, len(live))
 			return false
 		}
-		fmt.Printf("[RobotDnfTask] message_queue_overflow evict type=%s for=%s shard_len=%d\n", live[evict].Type, typ, len(live))
+		foundationlog.Robotf("[RobotDnfTask] message_queue_overflow evict type=%s for=%s shard_len=%d\n", live[evict].Type, typ, len(live))
 		copy(live[evict:], live[evict+1:])
 		live[len(live)-1] = MsgQueueData{}
 		shard.queue = live[:len(live)-1]
@@ -313,7 +313,7 @@ func (t *RobotDnfTask) AddMessageDelay(typ string, data interface{}, sleepVal in
 	default:
 	}
 	if len(t.messageTimerQueue) >= maxMessageTimerQueueSize {
-		fmt.Printf("[RobotDnfTask] timer_queue_overflow drop_oldest type=%s len=%d\n", typ, len(t.messageTimerQueue))
+		foundationlog.Robotf("[RobotDnfTask] timer_queue_overflow drop_oldest type=%s len=%d\n", typ, len(t.messageTimerQueue))
 		t.messageTimerQueue = t.messageTimerQueue[1:]
 	}
 	t.messageTimerQueue = append(t.messageTimerQueue, msg)
