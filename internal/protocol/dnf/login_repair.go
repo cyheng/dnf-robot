@@ -169,7 +169,7 @@ func repairLoginPrerequisites(db *sql.DB, uid int, loginIP string) bool {
 
 	capabilities, err := loginRepairCapabilitiesFor(ctx, db)
 	if err != nil {
-		fmt.Printf("MsgOnLine preflight sql failed: inspect login repair schema: %v\n", err)
+		foundationlog.Robotf("LOGIN_REPAIR_PREFLIGHT_FAILED uid=%d step=inspect_schema err=%v\n", uid, err)
 		return false
 	}
 	if !loginStaticRepairs.ensure(ctx, db, uid, func(ctx context.Context) bool {
@@ -237,14 +237,14 @@ func refreshLoginSessionWith(uid int, loginIP string, capabilities loginRepairCa
 
 func runOnlineRepairSQL(ctx context.Context, db *sql.DB, query string, step string, args ...interface{}) bool {
 	if db == nil {
-		fmt.Printf("MsgOnLine preflight sql failed: %s (no db)\n", step)
+		foundationlog.Robotf("LOGIN_REPAIR_SQL_FAILED step=%s reason=no_db\n", step)
 		return false
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if _, err := db.ExecContext(ctx, query, args...); err != nil {
-		fmt.Printf("MsgOnLine preflight sql failed: %s: %v\n", step, err)
+		foundationlog.Robotf("LOGIN_REPAIR_SQL_FAILED step=%s err=%v\n", step, err)
 		return false
 	}
 	return true

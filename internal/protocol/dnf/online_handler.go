@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"robot/internal/foundation/crypto"
+	foundationlog "robot/internal/foundation/log"
 	"robot/internal/shared"
 )
 
@@ -133,7 +134,7 @@ func resolveLoginToken(existing string, uid int, key *rsa.PrivateKey) string {
 		return token
 	}
 	token, err := crypto.GetLoginKey(uint32(uid), key)
-	fmt.Printf("[TOKEN_ERR] primary token failed; fallback GetLoginKey len=%d err=%v\n", len(token), err)
+	foundationlog.Robotf("LOGIN_TOKEN_FALLBACK len=%d err=%v\n", len(token), err)
 	return token
 }
 
@@ -182,7 +183,7 @@ func generateLoginToken(uid int, key *rsa.PrivateKey) string {
 	token[45] = 0x01
 	sig, err := rsa.SignPKCS1v15(nil, key, 0, token)
 	if err != nil {
-		fmt.Printf("[TOKEN_ERR] RSA sign failed: %v\n", err)
+		foundationlog.Robotf("LOGIN_TOKEN_SIGN_FAILED err=%v\n", err)
 		return ""
 	}
 	return base64.StdEncoding.EncodeToString(sig)
