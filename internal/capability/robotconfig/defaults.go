@@ -2,7 +2,7 @@ package robotconfig
 
 func Default() RuntimeConfig {
 	return RuntimeConfig{
-		LevelMin: 50, LevelMax: 85, Jobs: []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, GrowTypes: []int{0, 1, 2},
+		LevelMin: 50, LevelMax: 85, Jobs: []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, GrowTypes: []int{0, 1, 2},
 		RobotUIDStart:     17000000,
 		RobotUIDEnd:       17000999,
 		RobotUIDGuard:     17999999,
@@ -70,7 +70,7 @@ func Normalize(rc *RuntimeConfig) {
 		rc.InventoryCapacity = 16
 	}
 	if len(rc.Jobs) == 0 {
-		rc.Jobs = []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+		rc.Jobs = []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	}
 	if len(rc.GrowTypes) == 0 {
 		rc.GrowTypes = []int{0, 1, 2}

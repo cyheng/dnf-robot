@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"io/fs"
 	"os"
+	"reflect"
 	goruntime "runtime"
 	"testing"
 
@@ -97,8 +98,12 @@ func TestReleaseDefaultsCoversCanonicalRuntimeAssets(t *testing.T) {
 
 func assertReleasedRuntimeAssetsParse(t *testing.T, paths layout.Paths) {
 	t.Helper()
-	if _, err := robotconfig.LoadFile(paths.RobotConfig()); err != nil {
+	runtimeConfig, err := robotconfig.LoadFile(paths.RobotConfig())
+	if err != nil {
 		t.Fatalf("released robot config is invalid: %v", err)
+	}
+	if !reflect.DeepEqual(runtimeConfig, robotconfig.Default()) {
+		t.Fatalf("released robot config defaults drifted from code defaults: released=%+v code=%+v", runtimeConfig, robotconfig.Default())
 	}
 	if _, err := catalog.ReadNameTemplates(paths.NameTemplates()); err != nil {
 		t.Fatalf("released name templates are invalid: %v", err)
