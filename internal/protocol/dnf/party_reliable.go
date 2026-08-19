@@ -7,6 +7,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	foundationlog "robot/internal/foundation/log"
 )
 
 const (
@@ -146,11 +148,11 @@ func (r *RobotVo) recoverPartyRouteUnsafe(conn *net.UDPConn, peer partyIPPeer, r
 	packet := buildPartyTQOSPacket(sequence, r.partySelfPeer.slot, 0, 3, route, partyTQOSCodec{key: 0x7e})
 	destination, err := r.sendPartyTransportUnsafe(conn, peer, route, packet)
 	if err != nil {
-		fmt.Printf("[PARTY_ROUTE_RECOVERY_ERROR] uid=%d peer=%d slot=%d route=%d purpose=%s destination=%s err=%v\n",
+		foundationlog.Robotf("[PARTY_ROUTE_RECOVERY_ERROR] uid=%d peer=%d slot=%d route=%d purpose=%s destination=%s err=%v\n",
 			r.UID, peer.accID, peer.slot, route, stalled.purpose, destination, err)
 		return
 	}
-	fmt.Printf("[PARTY_ROUTE_RECOVERY] uid=%d peer=%d slot=%d route=%d stalled_sequence=%d age=%s retries=%d purpose=%s\n",
+	foundationlog.Robotf("[PARTY_ROUTE_RECOVERY] uid=%d peer=%d slot=%d route=%d stalled_sequence=%d age=%s retries=%d purpose=%s\n",
 		r.UID, peer.accID, peer.slot, route, stalled.sequence, now.Sub(stalled.firstSentAt).Round(time.Millisecond), stalled.retries, stalled.purpose)
 }
 

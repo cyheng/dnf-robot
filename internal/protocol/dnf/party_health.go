@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	foundationlog "robot/internal/foundation/log"
 )
 
 const (
@@ -27,7 +29,7 @@ func (r *RobotVo) setPartyRobotRouteReadyUnsafe(peer partyIPPeer, route byte, re
 		r.partyRouteActivityAt[peer.slot][route] = now
 		if !wasRouteReady {
 			recordPartyDebugPacket(r.UID, peer.accID, "--", "CORE", "TQOS_READY", "OK", fmt.Sprintf("slot=%d route=%d reason=%s", peer.slot, route, reason), nil)
-			fmt.Printf("[PARTY_ROBOT_TQOS_READY] uid=%d peer=%d slot=%d route=%d reason=%s\n", r.UID, peer.accID, peer.slot, route, reason)
+			foundationlog.Robotf("[PARTY_ROBOT_TQOS_READY] uid=%d peer=%d slot=%d route=%d reason=%s\n", r.UID, peer.accID, peer.slot, route, reason)
 		}
 		r.partyRobotProbeAt[peer.slot] = time.Time{}
 		r.partyRobotProbeCount[peer.slot] = 0
@@ -95,7 +97,7 @@ func (r *RobotVo) markPartyRouteFailureUnsafe(peer partyIPPeer, route byte, now 
 	}
 	if now.Before(r.partyRouteDiagAt[peer.slot][route]) {
 		if failedOver {
-			fmt.Printf("[PARTY_ROUTE_FAILOVER] uid=%d peer=%d slot=%d failed_route=%d active_route=%d reason=%s\n",
+			foundationlog.Robotf("[PARTY_ROUTE_FAILOVER] uid=%d peer=%d slot=%d failed_route=%d active_route=%d reason=%s\n",
 				r.UID, peer.accID, peer.slot, route, activeRoute, reason)
 		}
 		return
@@ -103,10 +105,10 @@ func (r *RobotVo) markPartyRouteFailureUnsafe(peer partyIPPeer, route byte, now 
 	r.partyRouteDiagAt[peer.slot][route] = now.Add(partyRouteDiagGap)
 	recordPartyDebugPacket(r.UID, peer.accID, "--", "CORE", "ROUTE_DEGRADED", "FAIL",
 		fmt.Sprintf("slot=%d route=%d failures=%d retry=%s reason=%s", peer.slot, route, failures, delay, reason), nil)
-	fmt.Printf("[PARTY_ROUTE_DEGRADED] uid=%d peer=%d slot=%d route=%d failures=%d retry_in=%s reason=%s\n",
+	foundationlog.Robotf("[PARTY_ROUTE_DEGRADED] uid=%d peer=%d slot=%d route=%d failures=%d retry_in=%s reason=%s\n",
 		r.UID, peer.accID, peer.slot, route, failures, delay, reason)
 	if failedOver {
-		fmt.Printf("[PARTY_ROUTE_FAILOVER] uid=%d peer=%d slot=%d failed_route=%d active_route=%d reason=%s\n",
+		foundationlog.Robotf("[PARTY_ROUTE_FAILOVER] uid=%d peer=%d slot=%d failed_route=%d active_route=%d reason=%s\n",
 			r.UID, peer.accID, peer.slot, route, activeRoute, reason)
 	}
 }
@@ -136,7 +138,7 @@ func (r *RobotVo) logPartyTransportClearedUnsafe(reason string) {
 		}
 	}
 	if known {
-		fmt.Printf("[PARTY_TRANSPORT_CLEARED] uid=%d reason=%s\n", r.UID, reason)
+		foundationlog.Robotf("[PARTY_TRANSPORT_CLEARED] uid=%d reason=%s\n", r.UID, reason)
 	}
 }
 
@@ -144,7 +146,7 @@ func (r *RobotVo) logPartyPeerTransportResetUnsafe(peer partyIPPeer, reason stri
 	if !partyPeerIdentityKnown(peer) {
 		return
 	}
-	fmt.Printf("[PARTY_PEER_TRANSPORT_RESET] uid=%d peer=%d unique=%d slot=%d reason=%s\n",
+	foundationlog.Robotf("[PARTY_PEER_TRANSPORT_RESET] uid=%d peer=%d unique=%d slot=%d reason=%s\n",
 		r.UID, peer.accID, peer.uniqueID, peer.slot, reason)
 }
 
@@ -171,7 +173,7 @@ func (r *RobotVo) markPartyRouteHealthyUnsafe(peer partyIPPeer, route byte, now 
 		r.partyLeaderTransportAt = now
 	}
 	if wasBlocked {
-		fmt.Printf("[PARTY_ROUTE_RECOVERED] uid=%d peer=%d slot=%d route=%d\n", r.UID, peer.accID, peer.slot, route)
+		foundationlog.Robotf("[PARTY_ROUTE_RECOVERED] uid=%d peer=%d slot=%d route=%d\n", r.UID, peer.accID, peer.slot, route)
 	}
 }
 

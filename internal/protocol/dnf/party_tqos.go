@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	foundationlog "robot/internal/foundation/log"
 )
 
 const (
@@ -36,7 +38,7 @@ func (r *RobotVo) flushPartyTQOSRepliesUnsafe(conn *net.UDPConn, now time.Time) 
 				pending.exhausted = true
 				pending.nextRetry = now.Add(partyTQOSSlowRetry)
 				sequence := binary.LittleEndian.Uint32(pending.packet[1:5])
-				fmt.Printf("[PARTY_TQOS_RETRY_EXHAUSTED] uid=%d peer=%d slot=%d route=%d sequence=%d retries=%d\n", r.UID, peer.accID, slot, route, sequence, pending.retries)
+				foundationlog.Robotf("[PARTY_TQOS_RETRY_EXHAUSTED] uid=%d peer=%d slot=%d route=%d sequence=%d retries=%d\n", r.UID, peer.accID, slot, route, sequence, pending.retries)
 				r.markPartyRouteFailureUnsafe(peer, route, now, "state2 ack timeout")
 				continue
 			}
@@ -360,7 +362,7 @@ func (r *RobotVo) tracePartyUDPUnsafe(reason string, remote *net.UDPAddr, sender
 	if remote != nil {
 		remoteText = remote.String()
 	}
-	fmt.Printf("[PARTY_ROBOT_UDP_%s] uid=%d peer=%d sender_slot=%d size=%d remote=%s\n", reason, r.UID, peer, slot, size, remoteText)
+	foundationlog.Robotf("[PARTY_ROBOT_UDP_%s] uid=%d peer=%d sender_slot=%d size=%d remote=%s\n", reason, r.UID, peer, slot, size, remoteText)
 }
 
 func (r *RobotVo) nextPartyTQOSSequenceUnsafe(peerSlot, route byte, reliable bool) (uint32, bool) {
@@ -474,11 +476,11 @@ func (r *RobotVo) sendPartyRobotPeerProbeRouteUnsafe(peer partyIPPeer, route byt
 	payload := buildPartyTQOSPacket(sequence, r.partySelfPeer.slot, 0, 3, route, partyTQOSCodec{key: 0x7e})
 	destination, err := r.sendPartyTransportUnsafe(r.partyUDPConn, peer, route, payload)
 	if err != nil {
-		fmt.Printf("[PARTY_ROBOT_PROBE_ERROR] uid=%d peer=%d route=%d attempt=%d destination=%s err=%v\n", r.UID, peer.accID, route, attempt, destination, err)
+		foundationlog.Robotf("[PARTY_ROBOT_PROBE_ERROR] uid=%d peer=%d route=%d attempt=%d destination=%s err=%v\n", r.UID, peer.accID, route, attempt, destination, err)
 		return false
 	}
 	if attempt == 1 {
-		fmt.Printf("[PARTY_ROBOT_PROBE_CYCLE] uid=%d peer=%d slot=%d route=%d sequence=%d destination=%s\n", r.UID, peer.accID, peer.slot, route, sequence, destination)
+		foundationlog.Robotf("[PARTY_ROBOT_PROBE_CYCLE] uid=%d peer=%d slot=%d route=%d sequence=%d destination=%s\n", r.UID, peer.accID, peer.slot, route, sequence, destination)
 	}
 	return true
 }
