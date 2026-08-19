@@ -51,7 +51,7 @@ func runMain() int {
 
 	if *webAdminMode {
 		if err := runWebAdmin(*robotAddr, *webAddr, *webConfigStdin); err != nil {
-			fmt.Printf("web admin failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "web admin failed: %v\n", err)
 			return 1
 		}
 		return 0
@@ -61,23 +61,23 @@ func runMain() int {
 
 	configPath, configDir, err := runtimeConfigPaths()
 	if err != nil {
-		fmt.Printf("resolve config path error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "resolve config path error: %v\n", err)
 		return 1
 	}
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
-		fmt.Printf("load config error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "load config error: %v\n", err)
 		return 1
 	}
 	cfg.ConfigDir = configDir
 	paths := layout.New(configDir)
 	if err := paths.Ensure(); err != nil {
-		fmt.Printf("create config dir error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "create config dir error: %v\n", err)
 		return 1
 	}
 	dnf.ConfigureLogRotation(cfg.LogMaxSizeMB, cfg.LogMaxBackups)
 	if err := dnf.LogInit(paths.RobotLog()); err != nil {
-		fmt.Printf("init log error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "init log error: %v\n", err)
 		return 1
 	}
 	foundationlog.SetRobotSink(func(msg string) {
