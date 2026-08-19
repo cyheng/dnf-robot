@@ -76,7 +76,7 @@ func (a *App) ensureMarketServiceSet(services []marketServiceSpec) map[string]bo
 				ready = a.ensureMarketService(service)
 				return nil
 			}); err != nil {
-				fmt.Printf("[MarketService] %v\n", err)
+				a.appendLog(LogEvent{Type: "market_service", Market: service.name, Status: marketLogStatusFailed, Message: err.Error()})
 			}
 			results <- result{name: service.name, ready: ready}
 		}()
@@ -276,7 +276,7 @@ func (a *App) refreshMarketServiceStatuses() {
 				a.refreshMarketServiceStatus(service)
 				return nil
 			}); err != nil {
-				fmt.Printf("[MarketService] %v\n", err)
+				a.appendLog(LogEvent{Type: "market_service", Market: service.name, Status: marketLogStatusFailed, Message: err.Error()})
 			}
 		}()
 	}

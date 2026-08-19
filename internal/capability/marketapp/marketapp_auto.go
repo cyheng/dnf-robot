@@ -160,7 +160,7 @@ func (a *App) autoLoop(ctx context.Context, done chan struct{}) {
 func (a *App) runAutoOnceSafely(ctx context.Context) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			fmt.Printf("[MarketAuto] run panic err=%v\n", rec)
+			a.appendLog(LogEvent{Type: "auto", Status: marketLogStatusFailed, Message: fmt.Sprintf("run panic: %v", rec)})
 		}
 	}()
 	a.runAutoOnce(ctx)
