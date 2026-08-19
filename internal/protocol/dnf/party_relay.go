@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	foundationlog "robot/internal/foundation/log"
 	foundationnetwork "robot/internal/foundation/network"
 )
 
@@ -52,21 +53,21 @@ func (r *RobotVo) connectPartyRelay(generation uint64, uid uint32, relayAddr str
 	if err != nil {
 		recordPartyDebugPacket(uid, 0, "--", "RELAY", "RELAY_CONNECT", "FAIL", fmt.Sprintf("addr=%s err=%v", relayAddr, err), nil)
 		r.finishPartyRelayConnect(generation, nil)
-		fmt.Printf("[PARTY_RELAY_CONNECT_ERROR] uid=%d addr=%s err=%v\n", uid, relayAddr, err)
+		foundationlog.Robotf("[PARTY_RELAY_CONNECT_ERROR] uid=%d addr=%s err=%v\n", uid, relayAddr, err)
 		return
 	}
 	auth, err := buildPartyRelayPacket(0, uid, 0, nil)
 	if err != nil {
 		_ = conn.Close()
 		r.finishPartyRelayConnect(generation, nil)
-		fmt.Printf("[PARTY_RELAY_AUTH_ERROR] uid=%d err=%v\n", uid, err)
+		foundationlog.Robotf("[PARTY_RELAY_AUTH_ERROR] uid=%d err=%v\n", uid, err)
 		return
 	}
 	if err := r.writePartyRelayConn(conn, auth); err != nil {
 		recordPartyDebugPacket(uid, 0, "TX", "RELAY", "RELAY_AUTH", "FAIL", err.Error(), auth)
 		_ = conn.Close()
 		r.finishPartyRelayConnect(generation, nil)
-		fmt.Printf("[PARTY_RELAY_AUTH_ERROR] uid=%d err=%v\n", uid, err)
+		foundationlog.Robotf("[PARTY_RELAY_AUTH_ERROR] uid=%d err=%v\n", uid, err)
 		return
 	}
 	recordPartyDebugPacket(uid, 0, "TX", "RELAY", "RELAY_AUTH", "OK", "write_ok", auth)
@@ -99,7 +100,7 @@ func (r *RobotVo) finishPartyRelayConnect(generation uint64, conn net.Conn) bool
 	}
 	r.startPartyRelayWriterUnsafe(conn)
 	recordPartyDebugPacket(r.UID, 0, "--", "RELAY", "RELAY_CONNECTED", "OK", "connected", nil)
-	fmt.Printf("[PARTY_RELAY_CONNECTED] uid=%d\n", r.UID)
+	foundationlog.Robotf("[PARTY_RELAY_CONNECTED] uid=%d\n", r.UID)
 	return true
 }
 
@@ -216,7 +217,7 @@ func (r *RobotVo) partyRelayWriteLoop(writer *partyRelayWriter, uid uint32) {
 				unexpected := r.detachPartyRelayConn(writer.conn)
 				_ = writer.conn.Close()
 				if unexpected {
-					fmt.Printf("[PARTY_RELAY_WRITE_ERROR] uid=%d err=%v\n", uid, err)
+					foundationlog.Robotf("[PARTY_RELAY_WRITE_ERROR] uid=%d err=%v\n", uid, err)
 				}
 				return
 			}
@@ -278,7 +279,7 @@ func (r *RobotVo) partyRelayLoop(conn net.Conn, uid uint32) {
 						unexpected := r.detachPartyRelayConn(conn)
 						_ = conn.Close()
 						if unexpected {
-							fmt.Printf("[PARTY_RELAY_HEARTBEAT_ERROR] uid=%d err=%v\n", uid, buildErr)
+							foundationlog.Robotf("[PARTY_RELAY_HEARTBEAT_ERROR] uid=%d err=%v\n", uid, buildErr)
 						}
 						return
 					}
@@ -286,7 +287,7 @@ func (r *RobotVo) partyRelayLoop(conn net.Conn, uid uint32) {
 						unexpected := r.detachPartyRelayConn(conn)
 						_ = conn.Close()
 						if unexpected {
-							fmt.Printf("[PARTY_RELAY_HEARTBEAT_ERROR] uid=%d err=%v\n", uid, err)
+							foundationlog.Robotf("[PARTY_RELAY_HEARTBEAT_ERROR] uid=%d err=%v\n", uid, err)
 						}
 						return
 					}
@@ -297,7 +298,7 @@ func (r *RobotVo) partyRelayLoop(conn net.Conn, uid uint32) {
 			unexpected := r.detachPartyRelayConn(conn)
 			_ = conn.Close()
 			if unexpected {
-				fmt.Printf("[PARTY_RELAY_READ_ERROR] uid=%d err=%v\n", uid, err)
+				foundationlog.Robotf("[PARTY_RELAY_READ_ERROR] uid=%d err=%v\n", uid, err)
 			}
 			return
 		}
@@ -311,7 +312,7 @@ func (r *RobotVo) partyRelayLoop(conn net.Conn, uid uint32) {
 				unexpected := r.detachPartyRelayConn(conn)
 				_ = conn.Close()
 				if unexpected {
-					fmt.Printf("[PARTY_RELAY_BAD_PACKET] uid=%d size=%d\n", uid, size)
+					foundationlog.Robotf("[PARTY_RELAY_BAD_PACKET] uid=%d size=%d\n", uid, size)
 				}
 				return
 			}
@@ -356,20 +357,20 @@ func (r *RobotVo) handlePartyRelayPacket(conn net.Conn, packet []byte) {
 	}
 	groups, err := groupPartyTransportFrames(replies, partyRelayMaxPacketSize-12)
 	if err != nil {
-		fmt.Printf("[PARTY_RELAY_REPLY_ERROR] uid=%d dst=%d err=%v\n", r.UID, src, err)
+		foundationlog.Robotf("[PARTY_RELAY_REPLY_ERROR] uid=%d dst=%d err=%v\n", r.UID, src, err)
 		return
 	}
 	for _, replyPayload := range groups {
 		reply, err := buildPartyRelayPacket(1, r.UID, src, replyPayload)
 		if err != nil {
-			fmt.Printf("[PARTY_RELAY_REPLY_ERROR] uid=%d dst=%d err=%v\n", r.UID, src, err)
+			foundationlog.Robotf("[PARTY_RELAY_REPLY_ERROR] uid=%d dst=%d err=%v\n", r.UID, src, err)
 			return
 		}
 		if err := r.enqueuePartyRelayPacket(conn, reply); err != nil {
 			unexpected := r.detachPartyRelayConn(conn)
 			_ = conn.Close()
 			if unexpected {
-				fmt.Printf("[PARTY_RELAY_REPLY_ERROR] uid=%d dst=%d err=%v\n", r.UID, src, err)
+				foundationlog.Robotf("[PARTY_RELAY_REPLY_ERROR] uid=%d dst=%d err=%v\n", r.UID, src, err)
 			}
 			return
 		}
