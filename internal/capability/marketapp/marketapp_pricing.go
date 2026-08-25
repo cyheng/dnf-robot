@@ -25,7 +25,11 @@ func (a *App) auctionUnitPriceFor(item catalogItem, equipmentMultiplier float64,
 	cfg := a.configSnapshot()
 	if item.ItemID > 0 {
 		if priceRange, ok := a.customPriceRange(item.ItemID); ok {
-			return a.randomPriceInRange(priceRange.MinPrice, priceRange.MaxPrice)
+			price := a.randomPriceInRange(priceRange.MinPrice, priceRange.MaxPrice)
+			if valueCategory(item) == valueCategoryEquipment {
+				price = clampEquipmentFinalPrice(price, cfg.Restock)
+			}
+			return price
 		}
 	}
 	price := configuredCenterPrice(item, cfg.Restock)
@@ -54,8 +58,10 @@ func (a *App) auctionUnitPriceFor(item catalogItem, equipmentMultiplier float64,
 			}
 		}
 	}
-	if category == valueCategoryEquipment && cfg.Restock.EquipmentFinalMaxPrice > 0 && price > float64(cfg.Restock.EquipmentFinalMaxPrice) {
-		price = float64(cfg.Restock.EquipmentFinalMaxPrice)
+	if category == valueCategoryEquipment {
+		if cfg.Restock.EquipmentFinalMaxPrice > 0 && price > float64(cfg.Restock.EquipmentFinalMaxPrice) {
+			price = float64(cfg.Restock.EquipmentFinalMaxPrice)
+		}
 	}
 	return boundedAuctionPrice(price)
 }
@@ -76,7 +82,16 @@ func (a *App) randomPriceInRange(low, high int32) int32 {
 
 func (a *App) auctionPriceBounds(item catalogItem) (int32, int32) {
 	if priceRange, ok := a.customPriceRange(item.ItemID); ok {
-		return priceRange.MinPrice, priceRange.MaxPrice
+		low, high := priceRange.MinPrice, priceRange.MaxPrice
+		if valueCategory(item) == valueCategoryEquipment {
+			cfg := a.configSnapshot()
+			low = clampEquipmentFinalPrice(low, cfg.Restock)
+			high = clampEquipmentFinalPrice(high, cfg.Restock)
+			if high < low {
+				low = high
+			}
+		}
+		return low, high
 	}
 	cfg := a.configSnapshot()
 	center := configuredCenterPrice(item, cfg.Restock)
@@ -107,6 +122,16 @@ func (a *App) auctionPriceBounds(item catalogItem) (int32, int32) {
 		}
 	}
 	return boundedAuctionPrice(low), boundedAuctionPrice(high)
+}
+
+func clampEquipmentFinalPrice(price int32, cfg RestockCfg) int32 {
+	if price < 1 {
+		price = 1
+	}
+	if cfg.EquipmentFinalMaxPrice > 0 && price > cfg.EquipmentFinalMaxPrice {
+		return cfg.EquipmentFinalMaxPrice
+	}
+	return price
 }
 
 func auctionUpgradePriceFactor(upgrade int, rate float64) float64 {

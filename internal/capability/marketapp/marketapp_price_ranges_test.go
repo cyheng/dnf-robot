@@ -20,6 +20,23 @@ func TestCustomPriceRangeOverridesFullEquipmentFormula(t *testing.T) {
 	}
 }
 
+func TestCustomEquipmentPriceRangeHonorsFinalMaximum(t *testing.T) {
+	app := testApp(t)
+	app.cfg.Restock.CustomPriceEnabled = true
+	app.cfg.Restock.EquipmentFinalMaxPrice = 200000000
+	mustWriteJSON(t, appPaths(app).MarketPrices(), customPriceRangeFile{Version: 1, Items: []customPriceRange{{ItemID: 31056, MinPrice: 300000000, MaxPrice: 400000000, Enabled: true}}})
+	app.refreshCustomPriceRanges()
+
+	price := app.auctionUnitPriceFor(catalogItem{ItemID: 31056, Kind: "equipment"}, 1, 0)
+	if price != 200000000 {
+		t.Fatalf("custom price=%d want final maximum 200000000", price)
+	}
+	low, high := app.auctionPriceBounds(catalogItem{ItemID: 31056, Kind: "equipment"})
+	if low != 200000000 || high != 200000000 {
+		t.Fatalf("custom bounds=%d..%d want 200000000..200000000", low, high)
+	}
+}
+
 func TestEquipmentFormulaBoundsIncludeUpgradeAndRandomRate(t *testing.T) {
 	app := testApp(t)
 	app.cfg.Restock.RandLow = 0.9
