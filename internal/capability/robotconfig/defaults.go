@@ -14,7 +14,7 @@ func Default() RuntimeConfig {
 		EquipSlots: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, EquipRarityMin: 0, EquipRarityMax: 5, EquipIntensifyMin: 7, EquipIntensifyMax: 10, EquipSmithingMin: 0, EquipSmithingMax: 8,
 		PreferEquipSets: true, EquipSetMinSlots: 2,
 		AvatarSlots: []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, MinAvatarSlots: 8, PreferAvatarSets: true, AvatarSetMinSlots: 2,
-		PetEnabled: true, PetArtifactEnabled: true, PetArtifactSlots: []int{31, 32, 33}, MinPetArtifactSlots: 1, MaxPetArtifactSlots: 2,
+		PetEnabled: true, PetProbabilityPercent: 80, PetArtifactEnabled: true, PetArtifactSlots: []int{31, 32, 33}, MinPetArtifactSlots: 1, MaxPetArtifactSlots: 2,
 		StoreEquipmentStartBox: 7, StoreMaterialStartBox: 105, StoreEquipmentIntensifyMin: 7, StoreEquipmentIntensifyMax: 13,
 		StoreEquipmentPriceMin: 500000, StoreEquipmentPriceMax: 1000000, StoreMaterialPriceMin: 10, StoreMaterialPriceMax: 50,
 		StoreEquipmentLevelWeight: 35, StoreEquipmentRarityWeight: 40, StoreEquipmentIntensifyWeight: 25,
@@ -108,6 +108,12 @@ func Normalize(rc *RuntimeConfig) {
 	}
 	if len(rc.PetArtifactSlots) == 0 {
 		rc.PetArtifactSlots = []int{31, 32, 33}
+	}
+	if rc.PetProbabilityPercent < 0 {
+		rc.PetProbabilityPercent = 0
+	}
+	if rc.PetProbabilityPercent > 100 {
+		rc.PetProbabilityPercent = 100
 	}
 	if rc.MinPetArtifactSlots < 0 {
 		rc.MinPetArtifactSlots = 0

@@ -43,7 +43,24 @@ func TestDefaultPetLoadoutIsPartial(t *testing.T) {
 	if !rc.PetEnabled || !rc.PetArtifactEnabled {
 		t.Fatalf("pet defaults disabled: enabled=%t artifacts=%t", rc.PetEnabled, rc.PetArtifactEnabled)
 	}
+	if rc.PetProbabilityPercent != 80 {
+		t.Fatalf("pet probability default = %d, want 80", rc.PetProbabilityPercent)
+	}
 	if len(rc.PetArtifactSlots) != 3 || rc.MinPetArtifactSlots != 1 || rc.MaxPetArtifactSlots != 2 {
 		t.Fatalf("pet artifact defaults = slots %v range %d..%d", rc.PetArtifactSlots, rc.MinPetArtifactSlots, rc.MaxPetArtifactSlots)
+	}
+}
+
+func TestNormalizeClampsPetProbability(t *testing.T) {
+	rc := Default()
+	rc.PetProbabilityPercent = -1
+	Normalize(&rc)
+	if rc.PetProbabilityPercent != 0 {
+		t.Fatalf("negative pet probability normalized to %d, want 0", rc.PetProbabilityPercent)
+	}
+	rc.PetProbabilityPercent = 101
+	Normalize(&rc)
+	if rc.PetProbabilityPercent != 100 {
+		t.Fatalf("excess pet probability normalized to %d, want 100", rc.PetProbabilityPercent)
 	}
 }

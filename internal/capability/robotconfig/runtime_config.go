@@ -47,6 +47,7 @@ type RuntimeConfig struct {
 	PreferAvatarSets              bool   `json:"prefer_avatar_sets"`
 	AvatarSetMinSlots             int    `json:"avatar_set_min_slots"`
 	PetEnabled                    bool   `json:"pet_enabled"`
+	PetProbabilityPercent         int    `json:"pet_probability_percent"`
 	PetArtifactEnabled            bool   `json:"pet_artifact_enabled"`
 	PetArtifactSlots              []int  `json:"pet_artifact_slots"`
 	MinPetArtifactSlots           int    `json:"min_pet_artifact_slots"`

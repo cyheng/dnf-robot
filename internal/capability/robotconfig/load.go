@@ -77,6 +77,7 @@ func decodeConfig(ini *config.INIConfig) (RuntimeConfig, error) {
 	rc.AvatarSetMinSlots = dec.Int("avatar", "avatar_set_min_slots", rc.AvatarSetMinSlots)
 
 	rc.PetEnabled = dec.Bool("pet", "pet_enabled", rc.PetEnabled)
+	rc.PetProbabilityPercent = dec.Int("pet", "pet_probability_percent", rc.PetProbabilityPercent)
 	rc.PetArtifactEnabled = dec.Bool("pet", "pet_artifact_enabled", rc.PetArtifactEnabled)
 	rc.PetArtifactSlots = dec.IntList("pet", "pet_artifact_slots", rc.PetArtifactSlots)
 	rc.MinPetArtifactSlots = dec.Int("pet", "min_pet_artifact_slots", rc.MinPetArtifactSlots)

@@ -64,6 +64,7 @@ avatar_set_min_slots = 3
 
 [pet]
 pet_enabled = false
+pet_probability_percent = 37
 pet_artifact_enabled = true
 pet_artifact_slots = 31,33
 min_pet_artifact_slots = 1
@@ -142,8 +143,8 @@ packet_rate_per_sec = 30
 	if !reflect.DeepEqual(rc.EquipSlots, []int{1, 3, 5}) || !reflect.DeepEqual(rc.AvatarSlots, []int{0, 2, 4}) {
 		t.Fatalf("slot lists not loaded: equipment=%v avatar=%v", rc.EquipSlots, rc.AvatarSlots)
 	}
-	if rc.PetEnabled || !rc.PetArtifactEnabled || !reflect.DeepEqual(rc.PetArtifactSlots, []int{31, 33}) || rc.MinPetArtifactSlots != 1 || rc.MaxPetArtifactSlots != 1 {
-		t.Fatalf("pet settings not loaded: enabled=%t artifacts=%t slots=%v range=%d..%d", rc.PetEnabled, rc.PetArtifactEnabled, rc.PetArtifactSlots, rc.MinPetArtifactSlots, rc.MaxPetArtifactSlots)
+	if rc.PetEnabled || rc.PetProbabilityPercent != 37 || !rc.PetArtifactEnabled || !reflect.DeepEqual(rc.PetArtifactSlots, []int{31, 33}) || rc.MinPetArtifactSlots != 1 || rc.MaxPetArtifactSlots != 1 {
+		t.Fatalf("pet settings not loaded: enabled=%t probability=%d artifacts=%t slots=%v range=%d..%d", rc.PetEnabled, rc.PetProbabilityPercent, rc.PetArtifactEnabled, rc.PetArtifactSlots, rc.MinPetArtifactSlots, rc.MaxPetArtifactSlots)
 	}
 	if rc.StoreEquipmentStartBox != 9 || rc.StoreMaterialStartBox != 107 || rc.StoreEquipmentIntensifyMin != 8 || rc.StoreEquipmentIntensifyMax != 12 {
 		t.Fatalf("store pool config not loaded: %+v", rc)
@@ -178,6 +179,7 @@ func TestLoadFileRejectsInvalidOrUnknownSettings(t *testing.T) {
 		"[online]\nmax_online_robots = 20\nmax_online_per_command = 21\n",
 		"[equipment]\nequip_slots = 0,1\n",
 		"[avatar]\navatar_slots = 0,1\nmin_avatar_slots = 3\n",
+		"[pet]\npet_probability_percent = 101\n",
 		"[store]\nstore_item_allow_ids = 3037\n",
 		"[store]\nstore_item_slots = 7\n",
 		"[store]\nstore_equipment_intensify_min = 14\nstore_equipment_intensify_max = 13\n",

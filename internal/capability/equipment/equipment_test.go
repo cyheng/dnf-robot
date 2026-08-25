@@ -232,6 +232,10 @@ func TestSelectPetChoosesPartialArtifactSet(t *testing.T) {
 	if _, ok := artifacts[31]; !ok {
 		t.Fatalf("artifacts = %#v, deterministic first artifact missing", artifacts)
 	}
+	_, artifacts, ok = SelectPet(items, rc, func(n int) int { return n - 1 })
+	if !ok || len(artifacts) != 2 {
+		t.Fatalf("artifacts = %#v, want two selected artifacts", artifacts)
+	}
 }
 
 func TestSelectPetCanDisableArtifactsAndPets(t *testing.T) {
