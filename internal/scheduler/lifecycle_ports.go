@@ -83,6 +83,10 @@ func (e lifecycleCreateEnv) LoadMapCatalog() []shared.MapCatalogItem {
 	return storecap.FilterNormalMaps(e.manager.loadMapCatalog())
 }
 
+func (e lifecycleCreateEnv) PetFromCatalog(cid int, rc robotconfig.RuntimeConfig, items []shared.EquipmentCatalogItem) error {
+	return e.manager.petFromCatalog(cid, rc, items)
+}
+
 func (e lifecycleCreateEnv) RobotLocations() ([]shared.MapLocation, error) {
 	return e.manager.schemaRepo().RobotLocations()
 }

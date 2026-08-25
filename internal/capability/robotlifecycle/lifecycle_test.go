@@ -30,8 +30,8 @@ func TestCreatorCapsCountAndCreatesRobots(t *testing.T) {
 	if len(robots) != 200 || env.created != 200 {
 		t.Fatalf("created got robots=%d env=%d want 200", len(robots), env.created)
 	}
-	if env.catalogLoads != 1 || env.equipCalls != 200 || env.avatarCalls != 200 || env.catalogMismatches != 0 {
-		t.Fatalf("catalog reuse got loads=%d equip=%d avatar=%d mismatches=%d", env.catalogLoads, env.equipCalls, env.avatarCalls, env.catalogMismatches)
+	if env.catalogLoads != 1 || env.equipCalls != 200 || env.avatarCalls != 200 || env.petCalls != 200 || env.catalogMismatches != 0 {
+		t.Fatalf("catalog reuse got loads=%d equip=%d avatar=%d pet=%d mismatches=%d", env.catalogLoads, env.equipCalls, env.avatarCalls, env.petCalls, env.catalogMismatches)
 	}
 	if robots[0].UID != 17000000 || robots[0].CID != 900000 || robots[0].Port != 10011 {
 		t.Fatalf("first robot got %+v", robots[0])
@@ -253,6 +253,7 @@ type testCreateEnv struct {
 	catalogLoads      int
 	equipCalls        int
 	avatarCalls       int
+	petCalls          int
 	catalogMismatches int
 	equipmentBase     *shared.EquipmentCatalogItem
 	maps              []shared.MapCatalogItem
@@ -348,6 +349,16 @@ func (e *testCreateEnv) LoadCreateCatalogs() CreateCatalogs {
 }
 
 func (e *testCreateEnv) LoadMapCatalog() []shared.MapCatalogItem { return e.maps }
+
+func (e *testCreateEnv) PetFromCatalog(_ int, _ robotconfig.RuntimeConfig, items []shared.EquipmentCatalogItem) error {
+	e.petCalls++
+	if len(items) != 1 || items[0].ID != 1001 {
+		e.catalogMismatches++
+	} else if e.equipmentBase != &items[0] {
+		e.catalogMismatches++
+	}
+	return nil
+}
 
 func (e *testCreateEnv) RobotLocations() ([]shared.MapLocation, error) {
 	return e.locations, nil

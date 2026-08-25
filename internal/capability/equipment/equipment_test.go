@@ -1,13 +1,76 @@
 package equipment
 
 import (
+	"bytes"
+	"compress/zlib"
 	"encoding/binary"
+	"io"
 	"math/rand"
 	"testing"
 
 	robotconfig "robot/internal/capability/robotconfig"
 	"robot/internal/shared"
 )
+
+func TestBuildCreatureSlotsUsesActiveCreatureRecord(t *testing.T) {
+	const itemID = 63050
+	raw := buildCreatureSlots(itemID, nil)
+	if len(raw) != 102*61 {
+		t.Fatalf("creature raw length=%d, want %d", len(raw), 102*61)
+	}
+	offset := 98 * 61
+	if raw[offset+1] != 5 || binary.LittleEndian.Uint32(raw[offset+2:offset+6]) != itemID || raw[offset+7] != 2 {
+		t.Fatalf("active creature record=%x", raw[offset:offset+61])
+	}
+	for i, value := range raw {
+		if i >= offset && i < offset+8 {
+			continue
+		}
+		if value != 0 {
+			t.Fatalf("unexpected nonzero creature byte at %d: %d", i, value)
+		}
+	}
+}
+
+func TestCompressedCreaturePreservesGameContainerHeader(t *testing.T) {
+	compressed := CompressedCreatureLoadout(63050, nil)
+	if len(compressed) < 4 || binary.LittleEndian.Uint32(compressed[:4]) != 102*61 {
+		header := compressed
+		if len(header) > 4 {
+			header = header[:4]
+		}
+		t.Fatalf("creature header=%x", header)
+	}
+	reader, err := zlib.NewReader(bytes.NewReader(compressed[4:]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = reader.Close()
+	if got := binary.LittleEndian.Uint32(raw[98*61+2 : 98*61+6]); got != 63050 {
+		t.Fatalf("compressed creature item id=%d", got)
+	}
+}
+
+func TestBuildCreatureSlotsMapsArtifactsToFinalRecords(t *testing.T) {
+	artifacts := map[int]shared.EquipmentCatalogItem{
+		31: {ID: 63500, ItemType: 31, Durability: 10},
+		33: {ID: 64500, ItemType: 33, Durability: 20},
+	}
+	raw := buildCreatureSlots(63050, artifacts)
+	for slot, want := range map[int]uint32{98: 63050, 99: 63500, 101: 64500} {
+		offset := slot * 61
+		if got := binary.LittleEndian.Uint32(raw[offset+2 : offset+6]); got != want {
+			t.Fatalf("creature record %d item id=%d, want %d", slot, got, want)
+		}
+	}
+	if got := binary.LittleEndian.Uint32(raw[100*61+2 : 100*61+6]); got != 0 {
+		t.Fatalf("unselected blue artifact item id=%d, want 0", got)
+	}
+}
 
 func TestWriteEquipSlotUsesHighIntensify(t *testing.T) {
 	opt := SlotOptions{IntensifyMin: 0, IntensifyMax: 10}
@@ -34,6 +97,18 @@ func TestWriteEquipSlotUsesPVFDurability(t *testing.T) {
 	WriteEquipSlot(raw, shared.EquipmentCatalogItem{ID: 1000, ItemType: 1, Durability: 18}, rand.New(rand.NewSource(1)), SlotOptions{})
 	if got := int(binary.LittleEndian.Uint16(raw[11:13])); got != 18 {
 		t.Fatalf("durability=%d, want 18", got)
+	}
+}
+
+func TestWritePetArtifactSlotUsesUnenhancedInventoryRecord(t *testing.T) {
+	raw := make([]byte, 61)
+	raw[6] = 99
+	WritePetArtifactSlot(raw, shared.EquipmentCatalogItem{ID: 63524, Durability: 12})
+	if raw[0] != 0 || raw[1] != 1 || binary.LittleEndian.Uint32(raw[2:6]) != 63524 {
+		t.Fatalf("artifact header=%x", raw[:6])
+	}
+	if raw[6] != 0 || binary.LittleEndian.Uint16(raw[11:13]) != 12 {
+		t.Fatalf("artifact enhancement/durability=%d/%d", raw[6], binary.LittleEndian.Uint16(raw[11:13]))
 	}
 }
 
@@ -132,6 +207,52 @@ func TestSelectAvatarScansCatalogAcrossConfiguredSlots(t *testing.T) {
 
 	if len(selected) != 2 || selected[0].ID != 100 || selected[9].ID != 900 {
 		t.Fatalf("selected avatar = %+v", selected)
+	}
+}
+
+func TestSelectPetChoosesPartialArtifactSet(t *testing.T) {
+	items := []shared.EquipmentCatalogItem{
+		{ID: 300, ItemType: 30},
+		{ID: 301, ItemType: 30},
+		{ID: 310, ItemType: 31},
+		{ID: 320, ItemType: 32},
+		{ID: 330, ItemType: 33},
+	}
+	rc := robotconfig.RuntimeConfig{
+		PetEnabled: true, PetArtifactEnabled: true,
+		PetArtifactSlots: []int{31, 32, 33}, MinPetArtifactSlots: 1, MaxPetArtifactSlots: 2,
+	}
+	pet, artifacts, ok := SelectPet(items, rc, func(n int) int { return 0 })
+	if !ok || pet.ItemType != 30 {
+		t.Fatalf("pet = %#v, artifacts = %#v, ok=%t", pet, artifacts, ok)
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("artifacts = %#v, want one selected artifact", artifacts)
+	}
+	if _, ok := artifacts[31]; !ok {
+		t.Fatalf("artifacts = %#v, deterministic first artifact missing", artifacts)
+	}
+}
+
+func TestSelectPetCanDisableArtifactsAndPets(t *testing.T) {
+	items := []shared.EquipmentCatalogItem{{ID: 300, ItemType: 30}, {ID: 310, ItemType: 31}}
+	if _, artifacts, ok := SelectPet(items, robotconfig.RuntimeConfig{PetEnabled: true, PetArtifactEnabled: false}, func(n int) int { return 0 }); !ok || len(artifacts) != 0 {
+		t.Fatalf("disabled artifacts result ok=%t artifacts=%#v", ok, artifacts)
+	}
+	if _, _, ok := SelectPet(items, robotconfig.RuntimeConfig{}, func(n int) int { return 0 }); ok {
+		t.Fatal("disabled pet unexpectedly selected")
+	}
+}
+
+func TestPetArtifactRenderableRejectsQuestMaterialFallback(t *testing.T) {
+	valid := shared.EquipmentCatalogItem{ID: 63524, ItemType: 31, Name: "artifact", Path: "equipment/creature/artifact_red/hand.equ", Icon: "Item/creature/artifact_red.img"}
+	invalid := valid
+	invalid.ID = 430000001
+	invalid.Name2 = "ErrorString"
+	invalid.NeedMaterial = true
+	invalid.Icon = "Item/stackable/quest.img"
+	if !PetArtifactRenderable(valid) || PetArtifactRenderable(invalid) {
+		t.Fatalf("artifact renderability valid=%t invalid=%t", PetArtifactRenderable(valid), PetArtifactRenderable(invalid))
 	}
 }
 

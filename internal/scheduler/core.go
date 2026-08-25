@@ -217,6 +217,7 @@ type SchemaRepository interface {
 	CreateBaseCharacter(info robotcap.Info, rc robotconfig.RuntimeConfig) error
 	SaveEquipmentSlots(cid int, raw []byte) error
 	ReplaceAvatarItems(cid int, selected map[int]shared.EquipmentCatalogItem) error
+	ReplacePetItems(cid int, pet shared.EquipmentCatalogItem, artifacts map[int]shared.EquipmentCatalogItem) error
 	MarkStoreStarted(uid int) error
 	PrepareStorePosition(info robotcap.Info) error
 	PrepareDisjointPosition(info robotcap.Info, cost int) error
@@ -362,6 +363,10 @@ func (missingSchemaRepository) SaveEquipmentSlots(int, []byte) error {
 }
 
 func (missingSchemaRepository) ReplaceAvatarItems(int, map[int]shared.EquipmentCatalogItem) error {
+	return errors.New("scheduler schema repository is not configured")
+}
+
+func (missingSchemaRepository) ReplacePetItems(int, shared.EquipmentCatalogItem, map[int]shared.EquipmentCatalogItem) error {
 	return errors.New("scheduler schema repository is not configured")
 }
 

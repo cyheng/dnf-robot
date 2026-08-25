@@ -66,6 +66,20 @@ func (m *RobotManager) avatarFromCatalog(cid int, level int, job int, rc robotco
 	return m.schemaRepo().ReplaceAvatarItems(cid, selected)
 }
 
+func (m *RobotManager) petFromCatalog(cid int, rc robotconfig.RuntimeConfig, items []shared.EquipmentCatalogItem) error {
+	if !rc.PetEnabled {
+		return nil
+	}
+	pet, artifacts, ok := equipcap.SelectPet(items, rc, m.randIntn)
+	if !ok {
+		return fmt.Errorf("pet creation enabled but no compatible creature is available for cid=%d", cid)
+	}
+	if len(artifacts) < rc.MinPetArtifactSlots {
+		return fmt.Errorf("pet creation selected %d artifacts for cid=%d, below configured minimum %d", len(artifacts), cid, rc.MinPetArtifactSlots)
+	}
+	return m.schemaRepo().ReplacePetItems(cid, pet, artifacts)
+}
+
 func (m *RobotManager) loadItemCatalogs() catalog.ItemCatalogView {
 	if m.cfg == nil {
 		return catalog.ItemCatalogView{}

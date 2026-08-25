@@ -117,17 +117,20 @@ func TestAppendItemInfoCreatureArtifacts(t *testing.T) {
 		"64500 3 1 1 1 1 1 1 1 1 1 1 1 70 `green` `green2` 14004\r\n" +
 		"63000 1 1 1 1 1 1 1 1 1 1 1 1 70 `creature` `creature2` 14001\r\n"
 	got := appendItemInfoCreatureArtifacts(nil, raw)
-	if len(got) != 3 {
-		t.Fatalf("artifact count got %d want 3: %#v", len(got), got)
+	if len(got) != 4 {
+		t.Fatalf("creature/artifact count got %d want 4: %#v", len(got), got)
 	}
-	if got[0].ID != 63500 || got[0].Slot != "artifact red" || got[0].ItemType != 31 {
-		t.Fatalf("red artifact not parsed: %#v", got[0])
+	if got[0].ID != 63000 || got[0].Slot != "creature" || got[0].ItemType != 30 {
+		t.Fatalf("creature not parsed: %#v", got[0])
 	}
-	if got[1].ID != 64000 || got[1].Slot != "artifact blue" || got[1].ItemType != 32 {
-		t.Fatalf("blue artifact not parsed: %#v", got[1])
+	if got[1].ID != 63500 || got[1].Slot != "artifact red" || got[1].ItemType != 31 {
+		t.Fatalf("red artifact not parsed: %#v", got[1])
 	}
-	if got[2].ID != 64500 || got[2].Slot != "artifact green" || got[2].ItemType != 33 {
-		t.Fatalf("green artifact not parsed: %#v", got[2])
+	if got[2].ID != 64000 || got[2].Slot != "artifact blue" || got[2].ItemType != 32 {
+		t.Fatalf("blue artifact not parsed: %#v", got[2])
+	}
+	if got[3].ID != 64500 || got[3].Slot != "artifact green" || got[3].ItemType != 33 {
+		t.Fatalf("green artifact not parsed: %#v", got[3])
 	}
 }
 

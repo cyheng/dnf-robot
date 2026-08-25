@@ -27,6 +27,38 @@ func CompressedZeros(length int) []byte {
 	return CompressRaw(make([]byte, length))
 }
 
+const (
+	creatureSlotSize          = 61
+	creatureSlotCount         = 102
+	activeCreatureSlot        = 98
+	firstCreatureArtifactSlot = 99
+)
+
+// buildCreatureSlots builds the creature inventory slice loaded
+// into creature inventory slots 140-241. Its final four records become the
+// equipped creature and red, blue, and green artifact slots respectively.
+func buildCreatureSlots(itemID int, artifacts map[int]shared.EquipmentCatalogItem) []byte {
+	raw := make([]byte, creatureSlotSize*creatureSlotCount)
+	if itemID > 0 {
+		offset := activeCreatureSlot * creatureSlotSize
+		raw[offset+1] = 5
+		binary.LittleEndian.PutUint32(raw[offset+2:offset+6], uint32(itemID))
+		raw[offset+7] = 2
+	}
+	for itemType, item := range artifacts {
+		if itemType < 31 || itemType > 33 || item.ID <= 0 || !PetArtifactRenderable(item) {
+			continue
+		}
+		slot := firstCreatureArtifactSlot + itemType - 31
+		WritePetArtifactSlot(raw[slot*creatureSlotSize:(slot+1)*creatureSlotSize], item)
+	}
+	return raw
+}
+
+func CompressedCreatureLoadout(itemID int, artifacts map[int]shared.EquipmentCatalogItem) []byte {
+	return CompressRaw(buildCreatureSlots(itemID, artifacts))
+}
+
 func CompressRaw(raw []byte) []byte {
 	var compressed bytes.Buffer
 	zw := zlib.NewWriter(&compressed)
@@ -249,6 +281,107 @@ func SelectAvatar(items []shared.EquipmentCatalogItem, job int, rc robotconfig.R
 	}
 	FillRandomItems(selected, candidatesBySlot, randIntn)
 	return selected
+}
+
+// SelectPet chooses one usable creature and a bounded subset of its artifact
+// slots. Pet artifacts are keyed by their protocol item type (31, 32, 33).
+func SelectPet(items []shared.EquipmentCatalogItem, rc robotconfig.RuntimeConfig, randIntn func(int) int) (shared.EquipmentCatalogItem, map[int]shared.EquipmentCatalogItem, bool) {
+	if !rc.PetEnabled {
+		return shared.EquipmentCatalogItem{}, nil, false
+	}
+	creatures := make([]shared.EquipmentCatalogItem, 0)
+	byType := make(map[int][]shared.EquipmentCatalogItem)
+	artifactSlots := rc.PetArtifactSlots
+	if len(artifactSlots) == 0 {
+		artifactSlots = []int{31, 32, 33}
+	}
+	allowed := make(map[int]struct{}, len(artifactSlots))
+	for _, itemType := range artifactSlots {
+		if itemType >= 31 && itemType <= 33 {
+			allowed[itemType] = struct{}{}
+		}
+	}
+	for _, item := range items {
+		if item.ID <= 0 || item.Expire || !shared.ClientCompatibleEquipment(item) {
+			continue
+		}
+		switch item.ItemType {
+		case 30:
+			creatures = append(creatures, item)
+		case 31, 32, 33:
+			if rc.PetArtifactEnabled {
+				if _, ok := allowed[item.ItemType]; ok && PetArtifactRenderable(item) {
+					byType[item.ItemType] = append(byType[item.ItemType], item)
+				}
+			}
+		}
+	}
+	if len(creatures) == 0 {
+		return shared.EquipmentCatalogItem{}, nil, false
+	}
+	pet := creatures[safeRandIntn(randIntn, len(creatures))]
+	if !rc.PetArtifactEnabled || len(byType) == 0 || rc.MaxPetArtifactSlots <= 0 {
+		return pet, nil, true
+	}
+	types := make([]int, 0, len(byType))
+	for itemType := range byType {
+		types = append(types, itemType)
+	}
+	sort.Ints(types)
+	maxSlots := rc.MaxPetArtifactSlots
+	if maxSlots > len(types) {
+		maxSlots = len(types)
+	}
+	minSlots := rc.MinPetArtifactSlots
+	if minSlots < 0 {
+		minSlots = 0
+	}
+	if minSlots > maxSlots {
+		minSlots = maxSlots
+	}
+	count := minSlots
+	if maxSlots > minSlots {
+		count += safeRandIntn(randIntn, maxSlots-minSlots+1)
+	}
+	selected := make(map[int]shared.EquipmentCatalogItem, count)
+	for i := 0; i < count; i++ {
+		last := len(types) - i - 1
+		pick := safeRandIntn(randIntn, last+1)
+		itemType := types[pick]
+		types[pick], types[last] = types[last], types[pick]
+		candidates := byType[itemType]
+		selected[itemType] = candidates[safeRandIntn(randIntn, len(candidates))]
+	}
+	return pet, selected, true
+}
+
+// PetArtifactRenderable rejects malformed item-info fallbacks and
+// quest-material scripts that happen to carry an artifact equipment type.
+// Those records have ErrorString names or stackable icons and are not
+// loadable by the game creature manager as equipped artifacts.
+func PetArtifactRenderable(item shared.EquipmentCatalogItem) bool {
+	if item.ID <= 0 || item.Expire || !shared.ClientCompatibleEquipment(item) {
+		return false
+	}
+	if item.ItemType < 31 || item.ItemType > 33 {
+		return false
+	}
+	name := strings.TrimSpace(item.Name)
+	if name == "" && (item.Path != "" || item.Icon != "" || item.Name2 != "") {
+		return false
+	}
+	if strings.EqualFold(name, "ErrorString") || strings.EqualFold(strings.TrimSpace(item.Name2), "ErrorString") {
+		return false
+	}
+	if item.NeedMaterial || item.BasicMaterial {
+		return false
+	}
+	path := strings.ToLower(strings.TrimSpace(item.Path))
+	if path != "" && path != "etc/iteminfo.dat" && !strings.Contains(path, "equipment/creature/artifact_") {
+		return false
+	}
+	icon := strings.ToLower(strings.TrimSpace(item.Icon))
+	return icon == "" || !strings.Contains(icon, "stackable")
 }
 
 func BuildEquipmentSlots(items []shared.EquipmentCatalogItem, level int, job int, rc robotconfig.RuntimeConfig, randIntn func(int) int, withRand func(func(*rand.Rand)) error) []byte {
@@ -481,6 +614,27 @@ func WriteEquipSlot(dst []byte, item shared.EquipmentCatalogItem, rng *rand.Rand
 	if item.ItemType == 1 {
 		dst[51] = byte(foundrand.BetweenAtLeast(rng, opt.SmithingMin, opt.SmithingMax))
 	}
+}
+
+// WritePetArtifactSlot builds the compact inventory record consumed by the
+// creature manager for an equipped artifact. Artifacts occupy the last three
+// records of the creature inventory block and do not use weapon-style
+// enhancement or random durability values.
+func WritePetArtifactSlot(dst []byte, item shared.EquipmentCatalogItem) {
+	if len(dst) < 61 || item.ID <= 0 {
+		return
+	}
+	clear(dst)
+	dst[1] = 0x01
+	binary.LittleEndian.PutUint32(dst[2:6], uint32(item.ID))
+	durability := item.Durability
+	if durability < 0 {
+		durability = 0
+	}
+	if durability > 65535 {
+		durability = 65535
+	}
+	binary.LittleEndian.PutUint16(dst[11:13], uint16(durability))
 }
 
 // WriteStoreEquipSlot builds a complete inventory equipment record once for

@@ -34,6 +34,7 @@ type CreateEnv interface {
 	EquipFromCatalog(cid int, level int, job int, rc robotconfig.RuntimeConfig, items []shared.EquipmentCatalogItem) error
 	LoadCreateCatalogs() CreateCatalogs
 	LoadMapCatalog() []shared.MapCatalogItem
+	PetFromCatalog(cid int, rc robotconfig.RuntimeConfig, items []shared.EquipmentCatalogItem) error
 	RobotLocations() ([]shared.MapLocation, error)
 	PrepareRobotUIDRange(uidStart, uidEnd, uidGuard int) error
 	RebuildCharacView(uid int) error
@@ -211,6 +212,9 @@ func (c Creator) createRobot(info robotcap.Info, rc robotconfig.RuntimeConfig, c
 		return err
 	}
 	if err := env.AvatarFromCatalog(info.CID, info.Level, info.Job, rc, catalogs.Equipment); err != nil {
+		return err
+	}
+	if err := env.PetFromCatalog(info.CID, rc, catalogs.Equipment); err != nil {
 		return err
 	}
 	if err := env.EnsureWorldHornByCID(info.CID); err != nil {

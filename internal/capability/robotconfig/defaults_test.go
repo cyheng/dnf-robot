@@ -37,3 +37,13 @@ func TestNormalizeStoreEquipmentPriceWeights(t *testing.T) {
 		t.Fatalf("default store equipment weights=%d/%d/%d", rc.StoreEquipmentLevelWeight, rc.StoreEquipmentRarityWeight, rc.StoreEquipmentIntensifyWeight)
 	}
 }
+
+func TestDefaultPetLoadoutIsPartial(t *testing.T) {
+	rc := Default()
+	if !rc.PetEnabled || !rc.PetArtifactEnabled {
+		t.Fatalf("pet defaults disabled: enabled=%t artifacts=%t", rc.PetEnabled, rc.PetArtifactEnabled)
+	}
+	if len(rc.PetArtifactSlots) != 3 || rc.MinPetArtifactSlots != 1 || rc.MaxPetArtifactSlots != 2 {
+		t.Fatalf("pet artifact defaults = slots %v range %d..%d", rc.PetArtifactSlots, rc.MinPetArtifactSlots, rc.MaxPetArtifactSlots)
+	}
+}

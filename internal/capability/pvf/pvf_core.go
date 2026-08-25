@@ -29,7 +29,10 @@ type pvfManifest struct {
 	Runtime           interface{} `json:"runtime,omitempty"`
 }
 
-const pvfExportVersion = 4
+// Bump when the exported catalog semantics change. Version 5 adds creature
+// rows sourced from etc/iteminfo.dat so robot creation can select pets even
+// when the PVF has no standalone equipment/creature/*.equ entry.
+const pvfExportVersion = 5
 
 const pvfSkillStateExportVersion = 2
 

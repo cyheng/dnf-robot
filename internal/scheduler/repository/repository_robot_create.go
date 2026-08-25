@@ -20,6 +20,12 @@ import (
 	"robot/internal/shared"
 )
 
+const (
+	equipmentRecordSize = 61
+	inventorySlotCount  = 249
+	equipslotSlotCount  = 12
+)
+
 type characterInitializer struct {
 	table    string
 	query    string
@@ -157,7 +163,7 @@ func (r *SQLRepository) CreateBaseCharacter(info robotcap.Info, rc robotconfig.R
 		{table: "taiwan_cain.new_charac_quest", query: "INSERT IGNORE INTO taiwan_cain.new_charac_quest (charac_no,play_1) VALUES (?,?)", args: []interface{}{info.CID, "1016"}},
 		{table: "taiwan_cain.pvp_result", query: "INSERT IGNORE INTO taiwan_cain.pvp_result (charac_no) VALUES (?)", args: []interface{}{info.CID}},
 		{table: "taiwan_cain_2nd.charac_inven_expand", query: "INSERT IGNORE INTO taiwan_cain_2nd.charac_inven_expand (charac_no) VALUES (?)", args: []interface{}{info.CID}},
-		{table: "taiwan_cain_2nd.inventory", query: "INSERT IGNORE INTO taiwan_cain_2nd.inventory (charac_no,money,coin,inventory_capacity,inventory,equipslot) VALUES (?,?,?,?,?,?)", args: []interface{}{info.CID, rc.DefaultMoney, rc.DefaultCoin, rc.InventoryCapacity, equipcap.CompressedZeros(249 * 61), equipcap.CompressedZeros(12 * 61)}, required: true},
+		{table: "taiwan_cain_2nd.inventory", query: "INSERT IGNORE INTO taiwan_cain_2nd.inventory (charac_no,money,coin,inventory_capacity,inventory,equipslot) VALUES (?,?,?,?,?,?)", args: []interface{}{info.CID, rc.DefaultMoney, rc.DefaultCoin, rc.InventoryCapacity, equipcap.CompressedZeros(inventorySlotCount * equipmentRecordSize), equipcap.CompressedZeros(equipslotSlotCount * equipmentRecordSize)}, required: true},
 		{table: "taiwan_cain_2nd.skill", query: "INSERT IGNORE INTO taiwan_cain_2nd.skill (charac_no) VALUES (?)", args: []interface{}{info.CID}, required: true},
 		{table: "taiwan_game_event.event_1306_account_reward", query: "INSERT IGNORE INTO taiwan_game_event.event_1306_account_reward (m_id,charac_no,occ_date) VALUES (?,?,NOW())", args: []interface{}{info.UID, info.CID}},
 	}
@@ -280,6 +286,87 @@ func (r *SQLRepository) ReplaceAvatarItems(cid int, selected map[int]shared.Equi
 		}
 	}
 	return tx.Commit()
+}
+
+// ReplacePetItems persists one creature and a partial set of creature
+// artifacts. Creature instances live in creature_items. The active creature
+// and equipped artifacts live in records 98-101 of the creature blob.
+func (r *SQLRepository) ReplacePetItems(cid int, pet shared.EquipmentCatalogItem, artifacts map[int]shared.EquipmentCatalogItem) error {
+	if cid <= 0 {
+		return fmt.Errorf("invalid pet character id %d", cid)
+	}
+	if pet.ID <= 0 {
+		return fmt.Errorf("invalid pet item id %d for cid=%d", pet.ID, cid)
+	}
+	creatureTable, err := r.TableExists("taiwan_cain_2nd.creature_items")
+	if err != nil {
+		return err
+	}
+	if !creatureTable {
+		return fmt.Errorf("taiwan_cain_2nd.creature_items is required when pet creation is enabled")
+	}
+	creatureColumns, err := r.TableColumns("taiwan_cain_2nd.creature_items")
+	if err != nil {
+		return err
+	}
+	inventoryColumns, err := r.TableColumns("taiwan_cain_2nd.inventory")
+	if err != nil {
+		return err
+	}
+	if !inventoryColumns["creature"] {
+		return fmt.Errorf("taiwan_cain_2nd.inventory has no creature column")
+	}
+	tx, err := r.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec("DELETE FROM taiwan_cain_2nd.creature_items WHERE charac_no=?", cid); err != nil {
+		return err
+	}
+	insertQuery, insertArgs, err := petCreatureItemInsert(cid, pet.ID, creatureColumns)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(insertQuery, insertArgs...); err != nil {
+		return err
+	}
+	query, args := petInventoryUpdate(cid, pet, artifacts, inventoryColumns["creature_flag"])
+	if _, err := tx.Exec(query, args...); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func petCreatureItemInsert(cid, petID int, columns map[string]bool) (string, []interface{}, error) {
+	const prefix = "INSERT INTO taiwan_cain_2nd.creature_items "
+	switch {
+	case tableHasColumns(columns, "no_charge", "stat", "item_lock_key", "ipg_agency_no", "expire_date", "delete_date"):
+		return prefix + "(charac_no,slot,it_id,reg_date,name,stomach,exp,endurance,creature_type,no_charge,stat,item_lock_key,ipg_agency_no,expire_date,delete_date) VALUES (?,238,?,NOW(),'',100,0,0,1,0,0,0,'','9999-12-31 23:59:59','9999-12-31 23:59:59')", []interface{}{cid, petID}, nil
+	case tableHasColumns(columns, "creature_level", "item_lock", "delete_flag", "skills", "expire_time", "item_creature_expire_time"):
+		return prefix + "(charac_no,slot,it_id,reg_date,name,stomach,exp,endurance,creature_type,creature_level,item_lock,delete_flag,skills,expire_time,item_creature_expire_time) VALUES (?,238,?,NOW(),'',100,0,0,1,0,0,0,'','9999-12-31 23:59:59','9999-12-31 23:59:59')", []interface{}{cid, petID}, nil
+	default:
+		return "", nil, fmt.Errorf("taiwan_cain_2nd.creature_items has no supported pet schema")
+	}
+}
+
+func tableHasColumns(columns map[string]bool, names ...string) bool {
+	for _, name := range names {
+		if !columns[name] {
+			return false
+		}
+	}
+	return true
+}
+
+func petInventoryUpdate(cid int, pet shared.EquipmentCatalogItem, artifacts map[int]shared.EquipmentCatalogItem, creatureFlag bool) (string, []interface{}) {
+	sets := []string{"creature=?"}
+	args := []interface{}{equipcap.CompressedCreatureLoadout(pet.ID, artifacts)}
+	if creatureFlag {
+		sets = append(sets, "creature_flag=1")
+	}
+	args = append(args, cid)
+	return "UPDATE taiwan_cain_2nd.inventory SET " + strings.Join(sets, ",") + " WHERE charac_no=?", args
 }
 
 func (r *SQLRepository) UpsertDummy(info robotcap.Info, innerIP string) error {

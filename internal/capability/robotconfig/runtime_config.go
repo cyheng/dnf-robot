@@ -46,6 +46,11 @@ type RuntimeConfig struct {
 	MinAvatarSlots                int    `json:"min_avatar_slots"`
 	PreferAvatarSets              bool   `json:"prefer_avatar_sets"`
 	AvatarSetMinSlots             int    `json:"avatar_set_min_slots"`
+	PetEnabled                    bool   `json:"pet_enabled"`
+	PetArtifactEnabled            bool   `json:"pet_artifact_enabled"`
+	PetArtifactSlots              []int  `json:"pet_artifact_slots"`
+	MinPetArtifactSlots           int    `json:"min_pet_artifact_slots"`
+	MaxPetArtifactSlots           int    `json:"max_pet_artifact_slots"`
 	StoreEquipmentPriceMin        int    `json:"store_equipment_price_min"`
 	StoreEquipmentPriceMax        int    `json:"store_equipment_price_max"`
 	StoreEquipmentLevelWeight     int    `json:"store_equipment_level_weight"`
@@ -101,5 +106,6 @@ func Clone(rc RuntimeConfig) RuntimeConfig {
 	rc.GrowTypes = append([]int(nil), rc.GrowTypes...)
 	rc.EquipSlots = append([]int(nil), rc.EquipSlots...)
 	rc.AvatarSlots = append([]int(nil), rc.AvatarSlots...)
+	rc.PetArtifactSlots = append([]int(nil), rc.PetArtifactSlots...)
 	return rc
 }

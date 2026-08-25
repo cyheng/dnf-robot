@@ -76,6 +76,12 @@ func decodeConfig(ini *config.INIConfig) (RuntimeConfig, error) {
 	rc.PreferAvatarSets = dec.Bool("avatar", "prefer_avatar_sets", rc.PreferAvatarSets)
 	rc.AvatarSetMinSlots = dec.Int("avatar", "avatar_set_min_slots", rc.AvatarSetMinSlots)
 
+	rc.PetEnabled = dec.Bool("pet", "pet_enabled", rc.PetEnabled)
+	rc.PetArtifactEnabled = dec.Bool("pet", "pet_artifact_enabled", rc.PetArtifactEnabled)
+	rc.PetArtifactSlots = dec.IntList("pet", "pet_artifact_slots", rc.PetArtifactSlots)
+	rc.MinPetArtifactSlots = dec.Int("pet", "min_pet_artifact_slots", rc.MinPetArtifactSlots)
+	rc.MaxPetArtifactSlots = dec.Int("pet", "max_pet_artifact_slots", rc.MaxPetArtifactSlots)
+
 	rc.StoreEquipmentPriceMin = dec.Int("store", "store_equipment_price_min", rc.StoreEquipmentPriceMin)
 	rc.StoreEquipmentPriceMax = dec.Int("store", "store_equipment_price_max", rc.StoreEquipmentPriceMax)
 	rc.StoreEquipmentLevelWeight = dec.Int("store", "store_equipment_level_weight", rc.StoreEquipmentLevelWeight)

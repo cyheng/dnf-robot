@@ -1,11 +1,13 @@
 package repository
 
 import (
+	"encoding/binary"
 	"reflect"
 	"strings"
 	"testing"
 
 	robotcap "robot/internal/capability/robot"
+	"robot/internal/shared"
 )
 
 func TestCreateCharacterStatInsertInitializesPreviousVillage(t *testing.T) {
@@ -16,6 +18,45 @@ func TestCreateCharacterStatInsertInitializesPreviousVillage(t *testing.T) {
 	want := []interface{}{661, "100", 12345, "-1", 5, 5}
 	if !reflect.DeepEqual(args, want) {
 		t.Fatalf("args = %#v, want %#v", args, want)
+	}
+}
+
+func TestPetInventoryUpdateOnlyTargetsCreatureColumns(t *testing.T) {
+	query, args := petInventoryUpdate(661, shared.EquipmentCatalogItem{ID: 63050}, map[int]shared.EquipmentCatalogItem{
+		31: {ID: 63500, ItemType: 31},
+	}, true)
+	if query != "UPDATE taiwan_cain_2nd.inventory SET creature=?,creature_flag=1 WHERE charac_no=?" {
+		t.Fatalf("pet inventory query=%q", query)
+	}
+	if len(args) != 2 || args[1] != 661 {
+		t.Fatalf("pet inventory args=%#v", args)
+	}
+	blob, ok := args[0].([]byte)
+	if !ok || len(blob) < 4 || binary.LittleEndian.Uint32(blob[:4]) != 102*61 {
+		t.Fatalf("pet creature blob header=%#v", args[0])
+	}
+}
+
+func TestPetCreatureItemInsertSelectsCurrentSchemaWithoutFallback(t *testing.T) {
+	columns := map[string]bool{
+		"no_charge": true, "stat": true, "item_lock_key": true,
+		"ipg_agency_no": true, "expire_date": true, "delete_date": true,
+	}
+	query, args, err := petCreatureItemInsert(661, 63050, columns)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(query, "no_charge,stat,item_lock_key") || strings.Contains(query, "creature_level") {
+		t.Fatalf("current creature insert query=%q", query)
+	}
+	if !reflect.DeepEqual(args, []interface{}{661, 63050}) {
+		t.Fatalf("current creature insert args=%#v", args)
+	}
+}
+
+func TestPetCreatureItemInsertRejectsUnknownSchema(t *testing.T) {
+	if _, _, err := petCreatureItemInsert(661, 63050, map[string]bool{}); err == nil {
+		t.Fatal("unknown creature_items schema was accepted")
 	}
 }
 

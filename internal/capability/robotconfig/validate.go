@@ -81,6 +81,10 @@ func validateRuntimeConfig(dec *foundationconfig.Decoder, rc RuntimeConfig) erro
 	dec.Check("avatar", "min_avatar_slots", rc.MinAvatarSlots >= 0 && rc.MinAvatarSlots <= len(rc.AvatarSlots), "must be between 0 and the number of avatar_slots")
 	checkRange("avatar", "avatar_set_min_slots", rc.AvatarSetMinSlots, 2, 10)
 	dec.Check("avatar", "avatar_set_min_slots", !rc.PreferAvatarSets || rc.AvatarSetMinSlots <= len(rc.AvatarSlots), "must not exceed the number of avatar_slots when prefer_avatar_sets is true")
+	checkListRange("pet", "pet_artifact_slots", rc.PetArtifactSlots, 31, 33)
+	checkRange("pet", "min_pet_artifact_slots", rc.MinPetArtifactSlots, 0, 3)
+	checkRange("pet", "max_pet_artifact_slots", rc.MaxPetArtifactSlots, 0, 3)
+	checkOrder("pet", "min_pet_artifact_slots", rc.MinPetArtifactSlots, "max_pet_artifact_slots", rc.MaxPetArtifactSlots)
 
 	checkPositive("store", "store_equipment_price_min", rc.StoreEquipmentPriceMin)
 	checkPositive("store", "store_equipment_price_max", rc.StoreEquipmentPriceMax)

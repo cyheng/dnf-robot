@@ -217,6 +217,8 @@ func appendItemInfoCreatureArtifacts(equipment []shared.EquipmentCatalogItem, ra
 
 func creatureArtifactCategory(category string) (string, int, bool) {
 	switch strings.TrimSpace(category) {
+	case "14001":
+		return "creature", 30, true
 	case "14002":
 		return "artifact red", 31, true
 	case "14003":
