@@ -3,6 +3,7 @@ package marketapp
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -133,6 +134,9 @@ func validateMarketConfig(cfg Config) error {
 		if err := validatePriceRule("category_price_rules."+category, rule); err != nil {
 			return err
 		}
+		if err := validateRarityScoreCurve("category_price_rules."+category+".rarity_score_curve", rule.RarityScoreCurve); err != nil {
+			return err
+		}
 	}
 	for category := range r.CategoryPriceRules {
 		if !validCategoryPriceRule(category) {
@@ -176,6 +180,51 @@ func validateMarketConfig(cfg Config) error {
 	}
 	if err := validateMarketLimits("auto", cfg.Auto.MaxActions, cfg.Auto.MaxConcurrent); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validateRarityScoreCurve(name, curve string) error {
+	curve = strings.TrimSpace(curve)
+	if curve == "" {
+		return nil
+	}
+	seen := make(map[int]struct{})
+	lastRarity := -1
+	last := -1.0
+	for _, part := range strings.Split(curve, ";") {
+		part = strings.TrimSpace(part)
+		if len(part) < 5 || part[0] != '(' || part[len(part)-1] != ')' {
+			return fmt.Errorf("%s must use (rarity,score%%) entries separated by semicolons", name)
+		}
+		fields := strings.Split(part[1:len(part)-1], ",")
+		if len(fields) != 2 {
+			return fmt.Errorf("%s has invalid entry %q", name, part)
+		}
+		rarity, err := strconv.Atoi(strings.TrimSpace(fields[0]))
+		if err != nil || rarity < 0 || rarity > 9 {
+			return fmt.Errorf("%s rarity must be an integer in 0..9", name)
+		}
+		if _, ok := seen[rarity]; ok {
+			return fmt.Errorf("%s contains duplicate rarity %d", name, rarity)
+		}
+		if rarity <= lastRarity {
+			return fmt.Errorf("%s entries must be ordered by rarity", name)
+		}
+		seen[rarity] = struct{}{}
+		lastRarity = rarity
+		raw := strings.TrimSpace(fields[1])
+		if !strings.HasSuffix(raw, "%") {
+			return fmt.Errorf("%s entry %q must use a percentage score", name, part)
+		}
+		score, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimSuffix(raw, "%")), 64)
+		if err != nil || !finiteInRange(score, 0, 100) {
+			return fmt.Errorf("%s scores must be finite percentages in 0..100", name)
+		}
+		if score < last {
+			return fmt.Errorf("%s scores must be non-decreasing by rarity", name)
+		}
+		last = score
 	}
 	return nil
 }

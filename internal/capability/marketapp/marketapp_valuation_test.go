@@ -67,3 +67,26 @@ func TestCategoryPriceIsMonotonicWithinRange(t *testing.T) {
 		t.Fatalf("category curve is not monotonic: low=%v high=%v", low, high)
 	}
 }
+
+func TestRarityScoreCurveChangesRaritySignalWithoutChangingLevelSignal(t *testing.T) {
+	rule := PriceRule{MinPrice: 100, MaxPrice: 1000000, RarityWeight: 1, LevelWeight: 1, RarityScoreCurve: "(0,0%);(2,5%);(3,30%);(5,100%)"}
+	low := priceRuleScore(catalogItem{Rarity: 2, Level: 0}, rule)
+	high := priceRuleScore(catalogItem{Rarity: 3, Level: 0}, rule)
+	if low != .025 || high != .15 {
+		t.Fatalf("custom rarity scores were not used: low=%v high=%v", low, high)
+	}
+	if priceRuleScore(catalogItem{Rarity: 2, Level: 70}, rule) <= low {
+		t.Fatal("level signal stopped contributing with a custom rarity curve")
+	}
+}
+
+func TestValidateRarityScoreCurve(t *testing.T) {
+	if err := validateRarityScoreCurve("curve", "(0,0%);(2,5%);(3,30%);(5,100%)"); err != nil {
+		t.Fatalf("valid curve rejected: %v", err)
+	}
+	for _, curve := range []string{"(2,5);(3,30%)", "(3,30%);(2,40%)", "(2,30%);(2,40%)", "(2,30%);(3,20%)"} {
+		if err := validateRarityScoreCurve("curve", curve); err == nil {
+			t.Fatalf("invalid curve accepted: %s", curve)
+		}
+	}
+}

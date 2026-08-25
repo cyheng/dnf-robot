@@ -254,7 +254,7 @@ func defaultRestockComments() map[string]string {
 		"upgrade_price_rate":        "Nonlinear equipment upgrade price rate; levels above +10 also add a quadratic risk premium using this rate.",
 		"rand_low":                  "Final random price multiplier lower bound for both stackable and equipment listings.",
 		"rand_high":                 "Final random price multiplier upper bound for both stackable and equipment listings.",
-		"category_price_rules":      "Per-category unit-price bounds and rarity, level, and PVF weights, including equipment.",
+		"category_price_rules":      "Per-category unit-price bounds and rarity, level, and PVF weights; equipment may also define rarity_score_curve entries such as (2,5%);(3,30%).",
 		"equipment_multiplier_min":  "Lower multiplier applied to the equipment category base price.",
 		"equipment_multiplier_max":  "Upper multiplier applied to the equipment category base price.",
 		"equipment_final_max_price": "Hard equipment unit-price ceiling after upgrade and random adjustments.",

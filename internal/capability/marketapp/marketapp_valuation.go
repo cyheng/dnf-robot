@@ -2,6 +2,7 @@ package marketapp
 
 import (
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -40,7 +41,7 @@ func defaultCategoryPriceRules() map[string]PriceRule {
 	rule := func(min, max int32, rarity, level, pvf float64) PriceRule {
 		return PriceRule{MinPrice: min, MaxPrice: max, RarityWeight: rarity, LevelWeight: level, PVFWeight: pvf}
 	}
-	return map[string]PriceRule{
+	rules := map[string]PriceRule{
 		valueCategoryEquipment:  rule(10000, 50000000, .4, .35, .25),
 		valueCategoryTitle:      rule(100000, 10000000, .4, .2, .4),
 		valueCategoryCard:       rule(20000, 20000000, .4, .2, .4),
@@ -53,6 +54,10 @@ func defaultCategoryPriceRules() map[string]PriceRule {
 		valueCategoryPuppet:     rule(5000, 200000, .4, .2, .4),
 		valueCategoryOther:      rule(100, 100000, .4, .2, .4),
 	}
+	equipment := rules[valueCategoryEquipment]
+	equipment.RarityScoreCurve = defaultEquipmentRarityScoreCurve
+	rules[valueCategoryEquipment] = equipment
+	return rules
 }
 
 func valueCategory(item catalogItem) string {
@@ -99,7 +104,7 @@ func valueCategory(item catalogItem) string {
 }
 
 func priceRuleScore(item catalogItem, rule PriceRule) float64 {
-	rarity := math.Max(0, math.Min(5, float64(item.Rarity))) / 5
+	rarity := rarityScore(item.Rarity, rule.RarityScoreCurve)
 	level := math.Max(0, math.Min(70, float64(item.Level))) / 70
 	raw := item.Price
 	if raw <= 10 {
@@ -118,6 +123,40 @@ func priceRuleScore(item catalogItem, rule PriceRule) float64 {
 		return 0
 	}
 	return (rarity*rarityWeight + level*levelWeight + pvf*pvfWeight) / total
+}
+
+// rarityScore preserves the historical linear 0..5 score when no curve is configured.
+func rarityScore(value int, curve string) float64 {
+	if strings.TrimSpace(curve) == "" {
+		return math.Max(0, math.Min(5, float64(value))) / 5
+	}
+	for _, part := range strings.Split(curve, ";") {
+		part = strings.TrimSpace(part)
+		if len(part) < 5 || part[0] != '(' || part[len(part)-1] != ')' {
+			continue
+		}
+		fields := strings.Split(part[1:len(part)-1], ",")
+		if len(fields) != 2 {
+			continue
+		}
+		rarity, err := strconv.Atoi(strings.TrimSpace(fields[0]))
+		if err != nil || rarity != value {
+			continue
+		}
+		raw := strings.TrimSpace(fields[1])
+		if strings.HasSuffix(raw, "%") {
+			raw = strings.TrimSpace(strings.TrimSuffix(raw, "%"))
+		}
+		score, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return 0
+		}
+		if strings.Contains(strings.TrimSpace(fields[1]), "%") {
+			score /= 100
+		}
+		return math.Max(0, math.Min(1, score))
+	}
+	return math.Max(0, math.Min(5, float64(value))) / 5
 }
 
 func priceFromRule(item catalogItem, rule PriceRule) float64 {

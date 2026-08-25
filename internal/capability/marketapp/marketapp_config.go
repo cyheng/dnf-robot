@@ -15,11 +15,12 @@ import (
 )
 
 const (
-	defaultMarketMaxActions  = 10000
-	defaultEquipmentRarities = "012345"
-	defaultOtherRarities     = "012345"
-	tradePolicyPermissive    = "permissive"
-	tradePolicyStrict        = "strict"
+	defaultMarketMaxActions          = 10000
+	defaultEquipmentRarities         = "012345"
+	defaultOtherRarities             = "012345"
+	defaultEquipmentRarityScoreCurve = "(0,0%);(1,20%);(2,40%);(3,60%);(4,80%);(5,100%);(6,100%);(7,100%);(8,100%);(9,100%)"
+	tradePolicyPermissive            = "permissive"
+	tradePolicyStrict                = "strict"
 )
 
 func DefaultConfig() Config {
@@ -117,6 +118,10 @@ func decodeMarketINI(ini *foundationconfig.INIConfig) (Config, error) {
 	if err := json.Unmarshal([]byte(ini.GetString("auction_price", "category_price_rules", mustJSON(d.Restock.CategoryPriceRules))), &c.Restock.CategoryPriceRules); err != nil {
 		return Config{}, fmt.Errorf("auction_price.category_price_rules: %w", err)
 	}
+	if equipment, ok := c.Restock.CategoryPriceRules[valueCategoryEquipment]; ok && strings.TrimSpace(equipment.RarityScoreCurve) == "" {
+		equipment.RarityScoreCurve = defaultEquipmentRarityScoreCurve
+		c.Restock.CategoryPriceRules[valueCategoryEquipment] = equipment
+	}
 	c.Restock.EquipmentMultiplierMin = iniFloat(ini, "auction_price", "equipment_multiplier_min", d.Restock.EquipmentMultiplierMin)
 	c.Restock.EquipmentMultiplierMax = iniFloat(ini, "auction_price", "equipment_multiplier_max", d.Restock.EquipmentMultiplierMax)
 	c.Restock.EquipmentFinalMaxPrice = int32(ini.GetInt("auction_price", "equipment_final_max_price", int(d.Restock.EquipmentFinalMaxPrice)))
@@ -174,7 +179,7 @@ func writeMarketConfig(path string, c Config) error {
 		"# 强化加价率（非线性）；+0 到 +10 按等级增长，+10 以上叠加二次增长的损坏风险溢价。", "upgrade_price_rate = " + formatFloat(c.Restock.UpgradePriceRate),
 		"# 最终价格的最小随机倍率。", "rand_low = " + formatFloat(c.Restock.RandLow),
 		"# 最终价格的最大随机倍率。", "rand_high = " + formatFloat(c.Restock.RandHigh),
-		"# 所有分类（含装备）的单价范围与分类内价值权重。", "category_price_rules = " + mustJSON(c.Restock.CategoryPriceRules),
+		"# 所有分类（含装备）的单价范围与分类内价值权重；装备可在 rarity_score_curve 中按稀有度 0-9 调整内部得分。", "category_price_rules = " + mustJSON(c.Restock.CategoryPriceRules),
 		"# 装备分类基础价的最小倍率。", "equipment_multiplier_min = " + formatFloat(c.Restock.EquipmentMultiplierMin),
 		"# 装备分类基础价的最大倍率。", "equipment_multiplier_max = " + formatFloat(c.Restock.EquipmentMultiplierMax),
 		"# 装备计算强化和随机波动后的最终单价上限。", fmt.Sprintf("equipment_final_max_price = %d", c.Restock.EquipmentFinalMaxPrice),

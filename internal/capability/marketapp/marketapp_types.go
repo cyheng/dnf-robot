@@ -56,11 +56,12 @@ type RestockCfg struct {
 }
 
 type PriceRule struct {
-	MinPrice     int32   `json:"min_price"`
-	MaxPrice     int32   `json:"max_price"`
-	RarityWeight float64 `json:"rarity_weight"`
-	LevelWeight  float64 `json:"level_weight"`
-	PVFWeight    float64 `json:"pvf_weight"`
+	MinPrice         int32   `json:"min_price"`
+	MaxPrice         int32   `json:"max_price"`
+	RarityWeight     float64 `json:"rarity_weight"`
+	RarityScoreCurve string  `json:"rarity_score_curve,omitempty"`
+	LevelWeight      float64 `json:"level_weight"`
+	PVFWeight        float64 `json:"pvf_weight"`
 }
 
 type CeraCfg struct {
