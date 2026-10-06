@@ -25,3 +25,14 @@ logs/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# AI/agent tooling directories
+.agentdocs/
+.claude/
+.trellis/
+
+# Auction planning and item correspondence artifacts
+dnf_robot_auction_plan.md
+item_name_list.txt
+restock_matched.csv
+restock_match_report.txt
