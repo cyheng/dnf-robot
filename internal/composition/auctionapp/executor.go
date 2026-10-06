@@ -55,6 +55,11 @@ func (e *actionExecutor) executeDirect(ctx context.Context, action marketapp.Act
 	if err == nil {
 		return res, nil
 	}
+	// 购买发送后断线可能已经成交，交由持久化预留等待核对，不能自动重发。
+	if action.Operation == "collect" {
+		e.resetSession(action.Market)
+		return res, err
+	}
 	if ctx != nil && ctx.Err() != nil {
 		return auction.Result{}, ctx.Err()
 	}
@@ -133,7 +138,7 @@ func (e *actionExecutor) executeDirectWithSession(ctx context.Context, action ma
 func (e *actionExecutor) withSession(ctx context.Context, market string, call func(*auction.Session) (auction.Result, error)) (auction.Result, error) {
 	session, err := e.session(ctx, market)
 	if err != nil {
-		return auction.Result{}, err
+		return auction.Result{}, fmt.Errorf("%w: %v", marketapp.ErrActionNotSubmitted, err)
 	}
 	stopCancel := closeSessionOnCancel(ctx, session)
 	result, err := call(session)

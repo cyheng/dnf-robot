@@ -61,6 +61,11 @@ func (a *App) loadAuctionCatalog(needAuction bool) (map[uint32]catalogItem, bool
 func (a *App) planAuctionMarket(req RestockRequest, catalog map[uint32]catalogItem, pvfReady bool, haveAuction map[uint32]int, occ map[uint32]int, decision *marketDecisionSnapshot, result *PlanResult) error {
 	cfg := a.configSnapshot()
 	decision.Auction = true
+	_, priceStatus := a.businessSnapshot()
+	if priceStatus.Version == 2 || priceStatus.Error != "" {
+		return a.planBusinessAuction(req, catalog, pvfReady, occ, result)
+	}
+
 	decision.observeAuctionInputs(a, catalog, pvfReady)
 	if err := a.appendRarityFilteredCollectActions(catalog, result); err != nil {
 		return err

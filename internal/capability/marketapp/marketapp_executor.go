@@ -6,6 +6,7 @@ import (
 )
 
 var ErrExecutorUnavailable = errors.New("market action executor unavailable")
+var ErrActionNotSubmitted = errors.New("交易请求尚未发送")
 
 type ActionExecutionResult struct {
 	ResultOK     *bool

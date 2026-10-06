@@ -15,6 +15,32 @@ func SetMarketApp(app *marketapp.App) {
 
 func handleMarketCommand(cmd, pkt string) (string, bool) {
 	switch cmd {
+	case "marketBusinessStatus":
+		app, err := requireMarketApp()
+		if err != nil {
+			return wrapResult(map[string]interface{}{"ok": false, "error": err.Error()}), true
+		}
+		res, err := app.BusinessStatus()
+		return wrapResult(map[string]interface{}{"ok": err == nil, "error": errString(err), "result": res}), true
+	case "marketBusinessUpdate":
+		app, err := requireMarketApp()
+		if err != nil {
+			return wrapResult(map[string]interface{}{"ok": false, "error": err.Error()}), true
+		}
+		var req marketapp.BusinessConfig
+		if err := decodePayload(pkt, &req); err != nil {
+			return wrapResult(map[string]interface{}{"ok": false, "error": err.Error()}), true
+		}
+		res, err := app.UpdateBusinessConfig(req)
+		return wrapResult(map[string]interface{}{"ok": err == nil, "error": errString(err), "result": res}), true
+	case "marketCollectPreview":
+		app, err := requireMarketApp()
+		if err != nil {
+			return wrapResult(map[string]interface{}{"ok": false, "error": err.Error()}), true
+		}
+		res, err := app.CollectPlan(marketapp.CollectRequest{Market: "auction"})
+		return wrapResult(map[string]interface{}{"ok": err == nil, "error": errString(err), "result": res}), true
+
 	case "marketStatus":
 		app, err := requireMarketApp()
 		if err != nil {

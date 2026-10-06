@@ -25,6 +25,24 @@ func (a *App) executeActions(ctx context.Context, jobID string, actions []Action
 	workCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	cfg := a.configSnapshot()
+	guard := a.newPurchaseGuard(actions)
+	_, businessStatus := a.businessSnapshot()
+	collectCount := 0
+	bounded := make([]Action, 0, len(actions))
+	for _, action := range actions {
+		if action.Market == marketNameAuction && action.Operation == "collect" && !action.SystemCleanup {
+			limit := businessStatus.Limits.MaxActions
+			if cfg.Collector.MaxActions > 0 && cfg.Collector.MaxActions < limit {
+				limit = cfg.Collector.MaxActions
+			}
+			if collectCount >= limit {
+				continue
+			}
+			collectCount++
+		}
+		bounded = append(bounded, action)
+	}
+	actions = bounded
 	workers := maxConcurrent
 	if workers <= 0 {
 		workers = cfg.Restock.MaxConcurrent
@@ -119,9 +137,10 @@ func (a *App) executeActions(ctx context.Context, jobID string, actions []Action
 				default:
 				}
 				entry := ActionEntry{Index: task.index, Action: task.action}
-				res, err := executeActionSafely(executor, workCtx, task.action)
+				res, err := guard.execute(executor, workCtx, task.action)
 				if err != nil {
 					entry.Error = err.Error()
+					entry.Pending = errors.Is(err, ErrPurchasePending)
 					record(entry, err)
 				} else {
 					entry.OK = res.ResultOK != nil && *res.ResultOK

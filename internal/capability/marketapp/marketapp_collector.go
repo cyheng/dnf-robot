@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"robot/internal/foundation/marketguard"
 )
 
 type collectRow struct {
+	Upgrade      *int
 	Market       string
 	AuctionID    uint64
 	OwnerID      uint32
@@ -26,7 +29,7 @@ func (a *App) CollectPlan(req CollectRequest) (PlanResult, error) {
 		return PlanResult{}, fmt.Errorf("collect: %w", err)
 	}
 	if market == marketNameAuction {
-		rows, err := a.repository.LoadCollectRows(cfg.AuctionDB, marketNameAuction, cfg.SystemOwner.IDBase, cfg.Collector.IncludeSystemOwners)
+		rows, err := a.repository.LoadCollectRows(cfg.AuctionDB, marketNameAuction, cfg.SystemOwner.IDBase, false)
 		if err != nil {
 			return PlanResult{}, err
 		}
@@ -39,6 +42,8 @@ func (a *App) CollectPlan(req CollectRequest) (PlanResult, error) {
 		}
 		a.appendCollectActions(rows, &result)
 	}
+	result.Actions = limitActions(result.Actions, req.MaxActions)
+	result.Summary.Skipped = len(result.Skipped)
 	result.Summary.Actions = len(result.Actions)
 	for _, action := range result.Actions {
 		switch action.Market {
@@ -55,70 +60,47 @@ func (a *App) CollectPlan(req CollectRequest) (PlanResult, error) {
 	return result, nil
 }
 
-type collectPriceStats struct {
-	Orders           int
-	InRange          int
-	OutOfRange       int
-	InRangeSelected  int
-	OutRangeSelected int
-}
-
 func (a *App) appendAuctionCollectActions(rows []collectRow, result *PlanResult) {
-	cfg := a.configSnapshot()
-	if !cfg.Collector.PriceRangeEnabled {
-		a.appendCollectActions(rows, result)
-		return
-	}
 	a.refreshCustomPriceRanges()
+	cfg := a.configSnapshot()
 	catalog, err := a.loadCatalog()
 	if err != nil {
-		catalog = nil
-		a.appendLog(LogEvent{Type: "collect_price_catalog", Market: marketNameAuction, Status: marketLogStatusFallback, Message: err.Error()})
+		result.Skipped = append(result.Skipped, SkippedItem{Market: marketNameAuction, Reason: "无法读取当前 PVF，停止收购"})
+		return
 	}
-	candidates := append([]collectRow(nil), rows...)
-	a.randomShuffle(len(candidates), func(i, j int) { candidates[i], candidates[j] = candidates[j], candidates[i] })
-	selected := make([]collectRow, 0, len(candidates))
-	stats := collectPriceStats{Orders: len(candidates)}
-	for _, row := range candidates {
-		inside := a.collectPriceInRange(row, catalog)
-		probability := cfg.Collector.OutRangeProbability
-		if inside {
-			stats.InRange++
-			probability = cfg.Collector.InRangeProbability
-		} else {
-			stats.OutOfRange++
+	if err = a.observeSystemSalePrices(catalog); err != nil {
+		result.Skipped = append(result.Skipped, SkippedItem{Market: marketNameAuction, Reason: err.Error()})
+		return
+	}
+	ledger, err := marketguard.Snapshot(a.configDir)
+	if err != nil {
+		result.Skipped = append(result.Skipped, SkippedItem{Market: marketNameAuction, Reason: err.Error()})
+		return
+	}
+	_, status := a.businessSnapshot()
+	maxActions := status.Limits.MaxActions
+	if cfg.Collector.MaxActions > 0 && cfg.Collector.MaxActions < maxActions {
+		maxActions = cfg.Collector.MaxActions
+	}
+	for _, row := range rows {
+		action, trade, limits, err := a.purchaseTerms(row, catalog[row.ItemID])
+		if err == nil {
+			err = marketguard.Check(ledger, a.tradeKey(row.AuctionID), trade, limits)
 		}
-		if probability <= 0 || (probability < 1 && a.randomFloat64() >= probability) {
+		if err != nil {
+			result.Skipped = append(result.Skipped, SkippedItem{Market: marketNameAuction, ItemID: row.ItemID, Reason: err.Error()})
 			continue
 		}
-		selected = append(selected, row)
-		if inside {
-			stats.InRangeSelected++
-		} else {
-			stats.OutRangeSelected++
+		if cfg.Collector.PriceRangeEnabled && (cfg.Collector.InRangeProbability <= 0 || a.randomFloat64() >= cfg.Collector.InRangeProbability) {
+			continue
 		}
-	}
-	a.appendCollectActions(selected, result)
-	a.appendLog(LogEvent{
-		Type: "collect_price_selection", Market: marketNameAuction, Status: marketLogStatusActive,
-		Message: fmt.Sprintf("orders=%d in_range=%d in_selected=%d out_of_range=%d out_selected=%d", stats.Orders, stats.InRange, stats.InRangeSelected, stats.OutOfRange, stats.OutRangeSelected),
-	})
-}
-
-func (a *App) collectPriceInRange(row collectRow, catalog map[uint32]catalogItem) bool {
-	item, known := catalog[row.ItemID]
-	if !known {
-		if _, custom := a.customPriceRange(row.ItemID); !custom {
-			return false
+		if maxActions <= 0 || len(result.Actions) >= maxActions {
+			break
 		}
-		item = catalogItem{ItemID: row.ItemID}
+		result.Actions = append(result.Actions, action)
+		// 计划使用内存预留，预览不会消耗持久化预算。
+		ledger.Trades[a.tradeKey(row.AuctionID)] = trade
 	}
-	low, high := a.auctionPriceBounds(item)
-	price := row.InstantPrice
-	if row.StartPrice == -1 && row.Count > 0 {
-		price = int32(int64(row.InstantPrice) / int64(row.Count))
-	}
-	return price >= low && price <= high
 }
 
 func (r SQLRepository) LoadCollectRows(dbName, market string, systemOwnerBase uint32, includeSystemOwners bool) ([]collectRow, error) {
@@ -139,7 +121,7 @@ func (r SQLRepository) loadCollectRowsWhere(dbName, market, ownerClause string, 
 		extraClause = " AND price = -1 AND instant_price > 0"
 	}
 	query := fmt.Sprintf(
-		"SELECT auction_id,owner_id,item_id,IFNULL(add_info,0),IFNULL(price,0),IFNULL(instant_price,0) FROM %s.`auction_main` WHERE %s%s ORDER BY auction_id ASC",
+		"SELECT auction_id,owner_id,item_id,IFNULL(add_info,0),IFNULL(price,0),IFNULL(instant_price,0),upgrade FROM %s.`auction_main` WHERE %s%s ORDER BY auction_id ASC",
 		quoteIdent(dbName), ownerClause, extraClause,
 	)
 	rows, err := r.db.Query(query, systemOwnerBase)
@@ -153,9 +135,9 @@ func (r SQLRepository) loadCollectRowsWhere(dbName, market, ownerClause string, 
 	var out []collectRow
 	for rows.Next() {
 		var row collectRow
-		var count, start, instant sql.NullInt64
+		var count, start, instant, upgrade sql.NullInt64
 		row.Market = market
-		if err := rows.Scan(&row.AuctionID, &row.OwnerID, &row.ItemID, &count, &start, &instant); err != nil {
+		if err := rows.Scan(&row.AuctionID, &row.OwnerID, &row.ItemID, &count, &start, &instant, &upgrade); err != nil {
 			return nil, err
 		}
 		if count.Valid {
@@ -167,13 +149,11 @@ func (r SQLRepository) loadCollectRowsWhere(dbName, market, ownerClause string, 
 		if instant.Valid {
 			row.InstantPrice = int32(instant.Int64)
 		}
+		if upgrade.Valid && upgrade.Int64 >= 0 && upgrade.Int64 <= marketConfigMaxUpgrade {
+			value := int(upgrade.Int64)
+			row.Upgrade = &value
+		}
 		if row.AuctionID == 0 {
-			continue
-		}
-		if row.InstantPrice <= 0 {
-			row.InstantPrice = row.StartPrice
-		}
-		if row.InstantPrice <= 0 {
 			continue
 		}
 		out = append(out, row)
@@ -223,6 +203,8 @@ func (a *App) appendCollectActions(rows []collectRow, result *PlanResult) {
 		buyerID := cfg.SystemOwner.BuyerBase + uint32(i%maxInt(cfg.SystemOwner.RotateEvery, 1))
 		result.Actions = append(result.Actions, Action{
 			Market:       row.Market,
+			SellerID:     row.OwnerID,
+			Upgrade:      row.Upgrade,
 			Kind:         "collect",
 			Operation:    "collect",
 			ItemID:       row.ItemID,
@@ -262,7 +244,11 @@ func (a *App) appendRarityFilteredCollectActions(catalog map[uint32]catalogItem,
 	if len(filtered) == 0 {
 		return nil
 	}
+	before := len(result.Actions)
 	a.appendCollectActions(filtered, result)
+	for i := before; i < len(result.Actions); i++ {
+		result.Actions[i].SystemCleanup = true
+	}
 	a.appendLog(LogEvent{Type: "rarity_filter_collect", Market: marketNameAuction, Status: marketLogStatusActive, Message: fmt.Sprintf("actions=%d", len(filtered))})
 	return nil
 }
@@ -322,6 +308,17 @@ func (a *App) collectOnce(ctx context.Context, req CollectRequest) (JobSummary, 
 	}
 	failedActions, entries, firstErr := a.executeActions(ctx, job.ID, actions, req.MaxConcurrent, req.ContinueOnError, &job)
 	a.reconcileCeraLanding(ctx, entries)
+	for _, entry := range entries {
+		if entry.Pending {
+			job.Status = MarketJobStatusPendingDB
+			job.Error = ErrPurchasePending.Error()
+			job.EndedAt = time.Now()
+			job.Duration = job.EndedAt.Sub(job.StartedAt).Milliseconds()
+			a.setLastJob(job)
+			a.appendLog(LogEvent{Type: "job_end", JobID: job.ID, Status: job.Status, Message: job.Error, Summary: job.Plan})
+			return job, firstErr
+		}
+	}
 	if err := ctx.Err(); err != nil || errors.Is(firstErr, context.Canceled) || errors.Is(firstErr, context.DeadlineExceeded) {
 		if err == nil {
 			err = firstErr

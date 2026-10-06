@@ -22,6 +22,12 @@ func (a *App) price(base int32) int32 {
 }
 
 func (a *App) auctionUnitPriceFor(item catalogItem, equipmentMultiplier float64, upgrade int) int32 {
+	rules, status := a.businessSnapshot()
+	if rule, ok := rules[item.ItemID]; status.Version == 2 && ok && rule.SellEnabled {
+		price, _ := a.businessPrices(rule, item, upgrade)
+		return price
+	}
+
 	cfg := a.configSnapshot()
 	if item.ItemID > 0 {
 		if priceRange, ok := a.customPriceRange(item.ItemID); ok {

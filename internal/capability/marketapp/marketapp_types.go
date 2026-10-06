@@ -226,12 +226,14 @@ type Status struct {
 }
 
 type PriceRangeStatus struct {
-	Enabled      bool      `json:"enabled"`
-	Path         string    `json:"path,omitempty"`
-	LoadedItems  int       `json:"loaded_items"`
-	InvalidItems int       `json:"invalid_items"`
-	LoadedAt     time.Time `json:"loaded_at,omitempty"`
-	Error        string    `json:"error,omitempty"`
+	Version      int            `json:"version"`
+	Limits       BusinessLimits `json:"limits"`
+	Enabled      bool           `json:"enabled"`
+	Path         string         `json:"path,omitempty"`
+	LoadedItems  int            `json:"loaded_items"`
+	InvalidItems int            `json:"invalid_items"`
+	LoadedAt     time.Time      `json:"loaded_at,omitempty"`
+	Error        string         `json:"error,omitempty"`
 }
 
 type MarketPolicyStatus struct {
@@ -374,29 +376,32 @@ type PlanSummary struct {
 }
 
 type Action struct {
-	Market       string `json:"market"`
-	Kind         string `json:"kind"`
-	Operation    string `json:"operation,omitempty"`
-	ItemID       uint32 `json:"item_id"`
-	ItemType     int    `json:"item_type,omitempty"`
-	Name         string `json:"name,omitempty"`
-	Count        int32  `json:"count"`
-	UnitPrice    int32  `json:"unit_price"`
-	TotalPrice   int32  `json:"total_price"`
-	OwnerID      uint32 `json:"owner_id"`
-	OwnerName    string `json:"owner_name"`
-	CountAddInfo int32  `json:"count_or_add_info"`
-	StartPrice   int32  `json:"start_price"`
-	InstantPrice int32  `json:"instant_price"`
-	Upgrade      *int   `json:"upgrade,omitempty"`
-	Endurance    int    `json:"endurance,omitempty"`
-	HasEndurance bool   `json:"has_endurance,omitempty"`
-	ExtraAddInfo int32  `json:"extra_add_info,omitempty"`
-	AuctionID    uint64 `json:"auction_id,omitempty"`
-	Source       string `json:"source"`
+	SellerID      uint32 `json:"seller_id,omitempty"`
+	SystemCleanup bool   `json:"system_cleanup,omitempty"`
+	Market        string `json:"market"`
+	Kind          string `json:"kind"`
+	Operation     string `json:"operation,omitempty"`
+	ItemID        uint32 `json:"item_id"`
+	ItemType      int    `json:"item_type,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Count         int32  `json:"count"`
+	UnitPrice     int32  `json:"unit_price"`
+	TotalPrice    int32  `json:"total_price"`
+	OwnerID       uint32 `json:"owner_id"`
+	OwnerName     string `json:"owner_name"`
+	CountAddInfo  int32  `json:"count_or_add_info"`
+	StartPrice    int32  `json:"start_price"`
+	InstantPrice  int32  `json:"instant_price"`
+	Upgrade       *int   `json:"upgrade,omitempty"`
+	Endurance     int    `json:"endurance,omitempty"`
+	HasEndurance  bool   `json:"has_endurance,omitempty"`
+	ExtraAddInfo  int32  `json:"extra_add_info,omitempty"`
+	AuctionID     uint64 `json:"auction_id,omitempty"`
+	Source        string `json:"source"`
 }
 
 type ActionEntry struct {
+	Pending   bool        `json:"pending_confirmation,omitempty"`
 	Index     int         `json:"index"`
 	Action    Action      `json:"action"`
 	OK        bool        `json:"ok"`
@@ -536,11 +541,19 @@ type corePoolItem struct {
 }
 
 type customPriceRange struct {
-	ItemID   uint32 `json:"item_id"`
-	Name     string `json:"name,omitempty"`
-	MinPrice int32  `json:"min_price"`
-	MaxPrice int32  `json:"max_price"`
-	Enabled  bool   `json:"enabled"`
+	ItemID                uint32 `json:"item_id"`
+	Name                  string `json:"name,omitempty"`
+	MinPrice              int32  `json:"min_price"`
+	MaxPrice              int32  `json:"max_price"`
+	Enabled               bool   `json:"enabled"`
+	SellEnabled           bool   `json:"sell_enabled"`
+	SellPrice             int32  `json:"sell_price"`
+	TargetQuantity        int    `json:"target_quantity"`
+	StackSize             int    `json:"stack_size"`
+	BuyEnabled            bool   `json:"buy_enabled"`
+	BuyMaxPrice           int32  `json:"buy_max_price"`
+	UpgradePolicy         string `json:"upgrade_policy"`
+	BuyDailyQuantityLimit int64  `json:"buy_daily_quantity_limit"`
 }
 
 type customPriceRangeFile struct {

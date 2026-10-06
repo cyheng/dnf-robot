@@ -24,6 +24,8 @@ func testApp(t *testing.T) *App {
 		t.Fatal(err)
 	}
 	app := &App{cfg: cfg, configDir: root, rand: rand.New(rand.NewSource(1))}
+	// 既有测试继续验证 v1 公式路径；经营规则测试显式写入 v2。
+	mustWriteJSON(t, layout.New(root).MarketPrices(), customPriceRangeFile{Version: 1, Items: []customPriceRange{}})
 	t.Cleanup(app.Shutdown)
 	return app
 }
@@ -153,6 +155,8 @@ func (r *clearStockRepository) DeleteSystemCreatureItems(string, uint32) (int64,
 }
 
 var _ Repository = (*clearStockRepository)(nil)
+
+func (r *clearStockRepository) LoadStoreSalePrices() (map[uint32]int32, error) { return nil, nil }
 
 func bytePtr(v byte) *byte {
 	return &v

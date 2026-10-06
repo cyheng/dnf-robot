@@ -143,6 +143,7 @@ func TestPlanAuctionAddsCollectForExistingHighRaritySystemStock(t *testing.T) {
 	app := testApp(t)
 	app.cfg.Restock.OtherAllowedRarities = "01234"
 	app.configDir = dir
+	mustWriteJSON(t, appPaths(app).MarketPrices(), customPriceRangeFile{Version: 1, Items: []customPriceRange{}})
 	repo := &clearStockRepository{
 		stock: map[string]map[uint32]int{
 			app.cfg.AuctionDB: {1001: 1, 1002: 1},

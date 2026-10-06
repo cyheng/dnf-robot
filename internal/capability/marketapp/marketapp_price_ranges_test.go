@@ -1,6 +1,7 @@
 package marketapp
 
 import (
+	"os"
 	"testing"
 )
 
@@ -131,7 +132,7 @@ func TestValueModelIsIncludedInCollectorBounds(t *testing.T) {
 	}
 }
 
-func TestCollectPricePolicyUsesHighAndLowProbabilities(t *testing.T) {
+func TestLegacySellPricesNeverGrantPurchasePermission(t *testing.T) {
 	app := testApp(t)
 	app.cfg.Collector.PriceRangeEnabled = true
 	app.cfg.Collector.InRangeProbability = 1
@@ -149,8 +150,8 @@ func TestCollectPricePolicyUsesHighAndLowProbabilities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Actions) != 1 || result.Actions[0].AuctionID != 1 {
-		t.Fatalf("selected actions=%#v want only in-range auction 1", result.Actions)
+	if len(result.Actions) != 0 {
+		t.Fatalf("旧版卖价不能授予收购权限：%#v", result.Actions)
 	}
 }
 
@@ -169,6 +170,39 @@ func TestInvalidCustomPriceFileFallsBackToFormula(t *testing.T) {
 	price := app.auctionUnitPriceFor(catalogItem{ItemID: 3037, Kind: "stackable"}, 1, 0)
 	if price != 100 {
 		t.Fatalf("value-model fallback price=%d want 100", price)
+	}
+}
+
+func TestReloadCustomPriceRangeFileRebuildsDefaultWhenDeleted(t *testing.T) {
+	app := testApp(t)
+	app.cfg.Restock.CustomPriceEnabled = true
+	doc := defaultCustomPriceRangeDocument()
+	doc.Items = []customPriceRange{
+		{ItemID: 4000, Name: "材料", SellEnabled: true, SellPrice: 200, TargetQuantity: 1000, StackSize: 100, BuyEnabled: true, BuyMaxPrice: 100, BuyDailyQuantityLimit: 1000, UpgradePolicy: "ignore"},
+	}
+	mustWriteJSON(t, appPaths(app).MarketPrices(), doc)
+	app.refreshCustomPriceRanges()
+	if _, status := app.businessSnapshot(); status.Error != "" {
+		t.Fatalf("初始加载失败：%s", status.Error)
+	}
+
+	// 删除文件，模拟用户在服务器上删 market_item_price_ranges.json。
+	if err := os.Remove(appPaths(app).MarketPrices()); err != nil {
+		t.Fatal(err)
+	}
+	// 文件监听器回调应重建默认清单，而不是报错挂起经营。
+	if err := app.reloadCustomPriceRangeFile(appPaths(app).MarketPrices()); err != nil {
+		t.Fatalf("删除后重载不应报错：%v", err)
+	}
+	if _, err := os.Stat(appPaths(app).MarketPrices()); err != nil {
+		t.Fatalf("默认清单未被重建：%v", err)
+	}
+	ranges, status := app.businessSnapshot()
+	if status.Error != "" {
+		t.Fatalf("重载后状态错误：%s", status.Error)
+	}
+	if status.Version != 2 || len(ranges) == 0 {
+		t.Fatalf("重载后未恢复默认清单：version=%d items=%d", status.Version, len(ranges))
 	}
 }
 

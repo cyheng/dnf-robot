@@ -1,5 +1,14 @@
 # AI Rules
 
+## 本地测试与验证
+
+- 修改前先读 `.agentdocs/index.md`；文档、注释与沟通使用中文。
+- Go 变更运行 `gofmt`、对应包测试、`go vet ./...` 和 `go test ./...`。
+- 新增或变更功能补充现有 Go testing 单元及集成测试，不引入测试框架。
+- 页面脚本修改运行 `node --check`、`node --test tools/market-business-ui.test.cjs` 和 `internal/entry/webadmin` 测试。
+- 主程序按 `.github/workflows` 编译 Linux amd64、CGO_ENABLED=0 到 `dist/robot`。
+- 若修改独立模块 `tools/deploy-launcher`，在该目录额外运行 `go vet ./...` 和 `go test ./...`。
+
 Before any VM, deploy, or debug task, read:
 
 - `doc/vm.md`

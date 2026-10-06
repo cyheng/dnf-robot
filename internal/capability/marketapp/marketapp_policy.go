@@ -229,6 +229,17 @@ func highMarketActionFailure(status MarketPolicyStatus) bool {
 
 func (a *App) observeAuctionCandidates() marketCandidateSnapshot {
 	catalog, err := a.loadCatalog()
+	_, status := a.businessSnapshot()
+	if status.Version == 2 || status.Error != "" {
+		if err != nil {
+			return marketCandidateSnapshot{Source: "business_list", Error: err.Error()}
+		}
+		candidates, err := a.auctionQueueCandidates(true, catalog)
+		if err != nil {
+			return marketCandidateSnapshot{Source: "business_list", Error: err.Error()}
+		}
+		return marketCandidateSnapshot{Count: len(candidates.Normal), Special: len(candidates.Special), Source: "business_list", Error: status.Error}
+	}
 	if err != nil {
 		rows, fallbackErr := a.fallbackAuctionRows()
 		if fallbackErr != nil {

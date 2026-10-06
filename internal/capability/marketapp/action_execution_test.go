@@ -55,8 +55,9 @@ func TestExecuteActionsAllowsAuctionSuccessWithZeroSequenceID(t *testing.T) {
 	job := &JobSummary{}
 
 	failed, entries, err := app.executeActions(context.Background(), "test", []Action{{
-		Market: marketNameAuction,
-		ItemID: 1001,
+		Market:    marketNameAuction,
+		ItemID:    1001,
+		UnitPrice: 100,
 	}}, 1, true, job)
 	if err != nil || failed != 0 || len(entries) != 1 || !entries[0].OK {
 		t.Fatalf("auction action with zero sequence id failed=%d err=%v entries=%#v", failed, err, entries)

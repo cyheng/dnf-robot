@@ -15,6 +15,32 @@ type fallbackSeed struct {
 }
 
 func (a *App) auctionQueueCandidates(pvfReady bool, catalog map[uint32]catalogItem) (auctionQueueCandidatesResult, error) {
+	rules, status := a.businessSnapshot()
+	if status.Version == 2 || status.Error != "" {
+		result := auctionQueueCandidatesResult{Source: marketQueueSourcePVFItemInfo}
+		if !pvfReady || status.Error != "" {
+			return result, nil
+		}
+		info, _, err := a.currentItemInfoIDs()
+		if err != nil {
+			return result, err
+		}
+		for id, rule := range rules {
+			item, exists := catalog[id]
+			if !rule.SellEnabled || !exists || !info[id] || !a.marketCandidate(item) {
+				continue
+			}
+			if specialAuctionKind(item) != "" {
+				result.Special = append(result.Special, id)
+			} else {
+				result.Normal = append(result.Normal, id)
+			}
+		}
+		sortCatalogAuctionIDs(result.Normal, catalog)
+		sortCatalogSpecialAuctionIDs(result.Special, catalog)
+		return result, nil
+	}
+
 	if pvfReady {
 		return a.pvfItemInfoAuctionQueueCandidates(catalog)
 	}

@@ -1,10 +1,12 @@
 package scheduler
 
 import (
+	"fmt"
 	robotcap "robot/internal/capability/robot"
 	robotconfig "robot/internal/capability/robotconfig"
 	storecap "robot/internal/capability/store"
 	"robot/internal/foundation/layout"
+	"robot/internal/foundation/marketguard"
 	"robot/internal/shared"
 )
 
@@ -202,6 +204,22 @@ func (e storePreparationEnv) RandBetween(min, max int) int {
 }
 
 func (e storePreparationEnv) ReplaceStoreStall(uid int, title string, items []storecap.StallItem) (storecap.StallResult, error) {
+	if e.manager.cfg == nil {
+		return storecap.StallResult{}, fmt.Errorf("缺少摊位市场价格配置路径")
+	}
+	prices := map[uint32]int32{}
+	for _, item := range items {
+		if item.ItemID <= 0 || item.Price <= 0 || int64(item.Price) > 2_000_000_000 {
+			return storecap.StallResult{}, fmt.Errorf("摊位物品价格无效")
+		}
+		id := uint32(item.ItemID)
+		if old := prices[id]; old == 0 || int32(item.Price) < old {
+			prices[id] = int32(item.Price)
+		}
+	}
+	if err := marketguard.RecordSales(e.manager.cfg.ConfigDir, prices); err != nil {
+		return storecap.StallResult{}, err
+	}
 	return e.manager.schemaRepo().ReplaceStoreStall(uid, title, items)
 }
 

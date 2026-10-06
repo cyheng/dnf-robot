@@ -73,10 +73,13 @@ func (p Paths) Ensure() error {
 	return nil
 }
 
-func (p Paths) MainConfig() string         { return categorizedPath(p.Conf, "config.ini") }
-func (p Paths) RobotConfig() string        { return categorizedPath(p.Conf, "robot_config.ini") }
-func (p Paths) MarketConfig() string       { return categorizedPath(p.Conf, "market_config.ini") }
-func (p Paths) MarketPrices() string       { return categorizedPath(p.Conf, "market_item_price_ranges.json") }
+func (p Paths) MainConfig() string   { return categorizedPath(p.Conf, "config.ini") }
+func (p Paths) RobotConfig() string  { return categorizedPath(p.Conf, "robot_config.ini") }
+func (p Paths) MarketConfig() string { return categorizedPath(p.Conf, "market_config.ini") }
+func (p Paths) MarketPrices() string { return categorizedPath(p.Conf, "market_item_price_ranges.json") }
+func (p Paths) MarketPurchaseLedger() string {
+	return categorizedPath(p.State, "market_purchase_ledger.json")
+}
 func (p Paths) MailboxGuard() string       { return categorizedPath(p.Conf, "compat.json") }
 func (p Paths) PartyCompatibility() string { return categorizedPath(p.Conf, "party_compat.json") }
 
