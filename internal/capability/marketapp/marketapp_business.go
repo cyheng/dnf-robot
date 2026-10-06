@@ -183,8 +183,9 @@ func (a *App) purchaseTerms(row collectRow, item catalogItem) (Action, marketgua
 	if !valid {
 		return Action{}, marketguard.Trade{}, marketguard.Limits{}, fmt.Errorf("无法确认物品类型或数量")
 	}
-	// 分堆购买使用另一种协议；本执行器只支持整单 Bid，保守拒绝 -1 哨兵。
-	if row.StartPrice < 0 {
+	// 堆叠物 price=-1 是分堆挂单，需要另一种购买协议，本执行器只支持整单 Bid。
+	// 装备 price=-1 是纯一口价（无竞拍底价），整单 Bid 可买，不视为分堆。
+	if row.StartPrice < 0 && item.Kind != "equipment" {
 		return Action{}, marketguard.Trade{}, marketguard.Limits{}, fmt.Errorf("当前收购协议不支持分堆挂单")
 	}
 	upgrade := 0

@@ -86,6 +86,18 @@ func TestBusinessMaterialQuantityAndUnsupportedBuyouts(t *testing.T) {
 	}
 }
 
+func TestBusinessEquipmentBuyoutWithNegativeStartPrice(t *testing.T) {
+	a, r := businessTestApp(t)
+	// 装备纯一口价（price=-1，无竞拍底价）应能收购，不视为分堆。
+	row := playerRow(1, 1001, 80000)
+	row.StartPrice = -1
+	r.collectRows[a.cfg.AuctionDB] = []collectRow{row}
+	plan, err := a.CollectPlan(CollectRequest{Market: "auction"})
+	if err != nil || len(plan.Actions) != 1 {
+		t.Fatalf("装备纯一口价应能收购：%v %+v", err, plan)
+	}
+}
+
 func TestBusinessUsesActualUpgradeAndExcludesSystemOwners(t *testing.T) {
 	a, r := businessTestApp(t)
 	rules, status := a.businessSnapshot()
